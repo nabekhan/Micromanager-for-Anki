@@ -1,4 +1,4 @@
-# zip -r Micromanager.ankiaddon * -x "*.DS_Store" -x "*__pycache__*" -x "meta.json" -x ".venv/*" -x ".git/*" -x "*gitignore"
+# zip -r Micromanager.ankiaddon * -x "*.DS_Store" -x "*__pycache__*" -x "meta.json" -x ".venv/*" -x ".git/*" -x "*gitignore" -x "*readme*"
 # __init__.py
 from aqt import mw
 
