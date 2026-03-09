@@ -154,7 +154,6 @@ class AnkiLock:
 
         if is_update:
             dialog.accept()
-            tooltip("Micromanager: Resuming Session...")
             self.timer.start(200)
             return
 
