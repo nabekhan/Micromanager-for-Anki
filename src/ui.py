@@ -26,9 +26,6 @@ class EventBlocker(QObject):
 
 def open_settings(addon, is_update=False):
     """Builds and displays the main, streamlined configuration window."""
-    mw.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
-    mw.showMaximized()
-
     d = QDialog(mw)
     d.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
     d.setWindowTitle("Micromanager")
@@ -63,6 +60,7 @@ def open_settings(addon, is_update=False):
     addon.rb_correct = QRadioButton("Correct Answers")
     addon.rb_time = QRadioButton("Time (Minutes)")
     addon.rb_finish = QRadioButton("Reviews Due")
+    addon.rb_finish_deck = QRadioButton("Complete Deck (All Cards)")  # NEW
 
     if addon.mode == "time":
         addon.rb_time.setChecked(True)
@@ -70,6 +68,8 @@ def open_settings(addon, is_update=False):
         addon.rb_correct.setChecked(True)
     elif addon.mode == "finish_reviews":
         addon.rb_finish.setChecked(True)
+    elif addon.mode == "finish_deck":  # NEW
+        addon.rb_finish_deck.setChecked(True)
     else:
         addon.rb_cards.setChecked(True)
 
@@ -85,8 +85,7 @@ def open_settings(addon, is_update=False):
     h_spin.addStretch()
 
     def update_ui_limits():
-        is_finish = addon.rb_finish.isChecked()
-        # Elements will completely collapse when hidden
+        is_finish = addon.rb_finish.isChecked() or addon.rb_finish_deck.isChecked()
         addon.spin_val.setVisible(not is_finish)
         lbl_suffix.setVisible(not is_finish)
 
@@ -104,6 +103,7 @@ def open_settings(addon, is_update=False):
     addon.rb_correct.toggled.connect(update_ui_limits)
     addon.rb_time.toggled.connect(update_ui_limits)
     addon.rb_finish.toggled.connect(update_ui_limits)
+    addon.rb_finish_deck.toggled.connect(update_ui_limits)  # NEW
     update_ui_limits()
 
     if addon.mode == "time" and addon.initial_minutes > 0:
@@ -122,6 +122,7 @@ def open_settings(addon, is_update=False):
     lay_goal.addWidget(addon.rb_correct)
     lay_goal.addWidget(addon.rb_time)
     lay_goal.addWidget(addon.rb_finish)
+    lay_goal.addWidget(addon.rb_finish_deck)
     lay_goal.addLayout(h_spin)
     sec_goal.setLayout(lay_goal)
     layout.addWidget(sec_goal)
@@ -191,7 +192,7 @@ def open_settings(addon, is_update=False):
     layout.addWidget(sec_sec)
 
     # --- Action Button ---
-    btn_text = "Resume Session" if is_update else "Activate Lock"
+    btn_text = "Close" if is_update else "Activate Lock"
     btn_color = "#3498db" if is_update else "#27ae60"
     btn_hover = "#2980b9" if is_update else "#2ecc71"
 
@@ -205,7 +206,11 @@ def open_settings(addon, is_update=False):
         f"QPushButton {{ background-color: {btn_color}; color: white; padding: 10px 10px; font-size: 14px; font-weight: bold; border-radius: 6px; border: none;}} "
         f"QPushButton:hover {{ background-color: {btn_hover}; }}"
     )
-    btn_start.clicked.connect(lambda: addon.start_lock(d, is_update))
+
+    if is_update:
+        btn_start.clicked.connect(d.accept)
+    else:
+        btn_start.clicked.connect(lambda: addon.start_lock(d))
 
     btn_layout = QHBoxLayout()
     btn_layout.addStretch()
@@ -267,8 +272,6 @@ def open_unlock_dialog(lock_type, expected_password):
         layout.addWidget(lbl)
         layout.addLayout(btn_layout)
         d.setLayout(layout)
-        d.exec()
-        return False
 
     elif lock_type == "random":
         lbl = QLabel("Type the following exact text to unlock:")
@@ -404,8 +407,8 @@ def open_confirm_quit_dialog():
     btn_yes.clicked.connect(d.accept)
 
     # Standard macOS button order (No on left, Yes on right)
-    btn_layout.addWidget(btn_no)
     btn_layout.addWidget(btn_yes)
+    btn_layout.addWidget(btn_no)
     btn_layout.addStretch()
 
     layout.addLayout(btn_layout)

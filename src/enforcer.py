@@ -6,7 +6,7 @@ from aqt.utils import tooltip
 from aqt.reviewer import Reviewer
 import string, random
 from .config import load_config, save_config
-from .web import get_hud_css_rules, HUD_HTML_TEMPLATE, HUD_JS
+from .web import get_hud_css_rules, HUD_HTML_TEMPLATE
 from . import ui
 
 
@@ -50,6 +50,8 @@ class AnkiLock:
         gui_hooks.webview_did_receive_js_message.append(self.on_js_message)
         gui_hooks.reviewer_did_answer_card.append(self.on_answer)
         gui_hooks.state_did_undo.append(self.on_undo)
+        gui_hooks.reviewer_did_show_question.append(self.on_question_shown)
+        gui_hooks.reviewer_did_show_answer.append(self.update_webview)
 
         gui_hooks.add_cards_did_init.append(self.on_secondary_window)
         gui_hooks.browser_will_show.append(self.on_secondary_window)
@@ -84,6 +86,7 @@ class AnkiLock:
             self.password = conf.get("saved_password", "")
             self.lock_type = conf.get("lock_type", "none")
             self.locked_deck_id = conf.get("locked_deck_id", None)
+            self.save_timer.start(10000)
 
             # Restore initial minutes so the settings UI displays correctly
             if self.mode == "time":
@@ -91,6 +94,7 @@ class AnkiLock:
 
             self.active = True
             mw.form.actionAdd_ons.setEnabled(False)
+            mw.form.actionSwitchProfile.setEnabled(False)
             self.timer.start(200)
             tooltip("Micromanager: Session Restored")
             mw.showMaximized()
@@ -129,42 +133,37 @@ class AnkiLock:
         action.triggered.connect(self.request_settings)
         mw.form.menuTools.addAction(action)
 
-    def start_lock(self, dialog, is_update=False):
-        if not is_update:
-            if self.rb_lock_custom.isChecked():
-                temp_pass = self.txt_pass.text().strip()
+    def start_lock(self, dialog):
 
-                # Check for empty password BEFORE overwriting anything
-                if not temp_pass:
-                    tooltip("Password cannot be empty!")
-                    return
+        if self.rb_lock_custom.isChecked():
+            temp_pass = self.txt_pass.text().strip()
 
-                self.lock_type = "custom"
-                self.password = temp_pass
-                self.custom_password = temp_pass
+            # Check for empty password BEFORE overwriting anything
+            if not temp_pass:
+                tooltip("Password cannot be empty!")
+                return
 
-            elif self.rb_lock_blind.isChecked():
-                self.lock_type = "blind"
-                self.password = ""
-            elif self.rb_lock_random.isChecked():
-                self.lock_type = "random"
-                chars = string.ascii_letters + string.digits
-                self.password = ''.join(random.choices(chars, k=200))
-            else:
-                self.lock_type = "none"
-                self.password = ""
+            self.lock_type = "custom"
+            self.password = temp_pass
+            self.custom_password = temp_pass
 
-            save_config({
-                "lock_type": self.lock_type,
-                "custom_password": getattr(self, "custom_password", "")
-            })
+        elif self.rb_lock_blind.isChecked():
+            self.lock_type = "blind"
+            self.password = ""
+        elif self.rb_lock_random.isChecked():
+            self.lock_type = "random"
+            chars = string.ascii_letters + string.digits
+            self.password = ''.join(random.choices(chars, k=200))
+        else:
+            self.lock_type = "none"
+            self.password = ""
 
-            self.locked_deck_id = None
+        save_config({
+            "lock_type": self.lock_type,
+            "custom_password": getattr(self, "custom_password", "")
+        })
 
-        if is_update:
-            dialog.accept()
-            self.timer.start(200)
-            return
+        self.locked_deck_id = None
 
         val = self.spin_val.value()
 
@@ -180,15 +179,39 @@ class AnkiLock:
             self.initial_minutes = 5
         elif getattr(self, 'rb_finish', None) and self.rb_finish.isChecked():
             self.mode = "finish_reviews"
-            counts = mw.col.sched.counts()
-            # Anki counts are returned as (new, learning, review)
-            self.target_val = counts[2] if counts and len(counts) >= 3 else 0
+
+            # Safely fetch counts
+            try:
+                counts = mw.col.sched.counts()
+                self.target_val = counts[2] if counts and len(counts) >= 3 else 0
+            except AttributeError:
+                self.target_val = 0
+                tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
+                return
 
             if self.target_val == 0:
                 tooltip("No reviews are currently due in this deck! Lock aborted.")
                 return
 
             self.current_val = 0  # Unused for this mode, but keeps state clean
+            self.initial_minutes = 5
+        elif getattr(self, 'rb_finish_deck', None) and self.rb_finish_deck.isChecked():
+            self.mode = "finish_deck"
+            try:
+                # counts() returns a tuple: (new, learning, review)
+                # sum() adds all three together for the total deck load
+                counts = mw.col.sched.counts()
+                self.target_val = sum(counts) if counts else 0
+            except AttributeError:
+                self.target_val = 0
+                tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
+                return
+
+            if self.target_val == 0:
+                tooltip("No cards are currently due in this deck! Lock aborted.")
+                return
+
+            self.current_val = 0
             self.initial_minutes = 5
         else:
             self.mode = "cards"
@@ -198,6 +221,8 @@ class AnkiLock:
 
         self.active = True
         mw.form.actionAdd_ons.setEnabled(False)
+        mw.form.actionSwitchProfile.setEnabled(False)
+        self.save_timer.start(10000)
 
         self.locked_deck_id = mw.col.decks.get_current_id()
 
@@ -220,21 +245,21 @@ class AnkiLock:
         self.active = False
         self.locked_deck_id = None
         self.timer.stop()
+        self.save_timer.stop()
         self.clear_persistence()
 
         # Re-enable the Add-ons menu if locked
         if hasattr(mw.form, 'actionAdd_ons'):
             mw.form.actionAdd_ons.setEnabled(True)
+            mw.form.actionSwitchProfile.setEnabled(True)
 
-        for widget in QApplication.topLevelWidgets():
-            if isinstance(widget, (QMainWindow, QDialog)):
-                flags = widget.windowFlags()
-                if flags & Qt.WindowType.WindowStaysOnTopHint:
-                    widget.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
-                    if widget.isVisible():
-                        widget.show()
+        flags = mw.windowFlags()
+        if flags & Qt.WindowType.WindowStaysOnTopHint:
+            mw.setWindowFlags(flags & ~Qt.WindowType.WindowStaysOnTopHint)
+            if mw.isVisible():
+                mw.show()
 
-        mw.showMaximized()
+        mw.show()
 
         # BULLETPROOF HUD REMOVAL
         # Finds any element with the HUD ID and removes it directly from the DOM
@@ -282,17 +307,23 @@ class AnkiLock:
             text_display = str(remaining)
             label_display = "REVIEWS LEFT"
 
-        else: # cards
+        elif self.mode == "finish_deck":  # NEW
+            counts = mw.col.sched.counts()
+            remaining = sum(counts) if counts else 0
+            text_display = str(remaining)
+            label_display = "TOTAL LEFT"
+
+        else:  # cards
             remaining = self.target_val - self.current_val
             text_display = str(max(0, remaining))
             label_display = "CARDS LEFT"
 
-        # 2. Calculate Percentage once
+            # 2. Calculate Percentage once
         if self.target_val == 0:
             pct = 100
-        elif self.mode in ("time", "finish_reviews"):
+        elif self.mode in ("time", "finish_reviews", "finish_deck"):
             pct = (remaining / self.target_val) * 100
-        else: # correct, cards
+        else:  # correct, cards
             pct = (self.current_val / self.target_val) * 100
 
         return text_display, label_display, max(0, min(100, pct))
@@ -377,6 +408,14 @@ class AnkiLock:
                 self.stop_lock(success=True)
                 return
 
+        # Check if the entire deck is cleared
+        elif self.mode == "finish_deck" and mw.state == "review":
+            counts = mw.col.sched.counts()
+            remaining_total = sum(counts) if counts else 0
+            if remaining_total == 0:
+                self.stop_lock(success=True)
+                return
+
         # === 3. TIMER LOGIC ===
         if self.mode == "time":
             self._tick_counter += 1
@@ -392,6 +431,34 @@ class AnkiLock:
                     self.stop_lock(success=True)
                     return
                 self.update_webview()
+
+    def on_question_shown(self, card):
+        if not self.active: return
+
+        # Edge Case: The user suspended/buried a card, which alters due counts
+        # without triggering on_answer. We check if they won the "finish_reviews" goal here.
+        if self.mode == "finish_reviews":
+            try:
+                counts = mw.col.sched.counts()
+                remaining_reviews = counts[2] if counts and len(counts) >= 3 else 0
+                if remaining_reviews <= 0:
+                    self.stop_lock(success=True)
+                    return
+            except AttributeError:
+                pass
+
+        elif self.mode == "finish_deck":
+            try:
+                counts = mw.col.sched.counts()
+                remaining_total = sum(counts) if counts else 0
+                if remaining_total <= 0:
+                    self.stop_lock(success=True)
+                    return
+            except AttributeError:
+                pass
+
+        # Refresh the HUD on the new card
+        self.update_webview()
 
     def on_answer(self, reviewer, card, ease):
         if not self.active: return
@@ -414,13 +481,13 @@ class AnkiLock:
 
     def on_undo(self, *args):
         if not self.active: return
-        # Only reverse the counter for modes that track increments!
-        if self.mode in ("cards", "correct") and self.current_val > 0:
+        if self.mode == "cards" and self.current_val > 0:
             self.current_val -= 1
+
         self.update_webview()
         self.update_persistence()
 
-    def update_webview(self):
+    def update_webview(self, *args, **kwargs):
         if not self.active: return
         if mw.state != "review": return
         if not getattr(mw.reviewer, "card", None): return
@@ -434,27 +501,30 @@ class AnkiLock:
         js_cmd = f"""
         (function(){{
             var hud = document.getElementById('force-hud-container');
-            if (!hud || !window.updateForceHud) {{
-                // Remove old zombie HUD if it exists but is broken
-                if (hud) hud.remove();
-
-                // Re-inject Style
+            
+            // If the HUD is missing, rebuild it from scratch
+            if (!hud) {{
                 var s = document.createElement('style');
                 s.textContent = '{raw_css}';
                 document.head.appendChild(s);
 
-                // Re-inject HTML
                 var d = document.createElement('div');
                 d.innerHTML = '{safe_html}';
                 document.body.appendChild(d);
-
-                // Re-inject JS Functions
-                {HUD_JS}
+                
+                // Re-fetch the newly created HUD
+                hud = document.getElementById('force-hud-container');
             }}
 
-            // Final check to ensure the function exists before calling
-            if(window.updateForceHud) {{
-                window.updateForceHud('{text_display}', '{label_display}', {pct});
+            // Directly update the DOM to bypass window context resets
+            if (hud) {{
+                var valEl = document.getElementById('val-display');
+                var lblEl = document.getElementById('lbl-display');
+                var progEl = document.getElementById('force-hud-progress');
+                
+                if (valEl) valEl.innerText = '{text_display}';
+                if (lblEl) lblEl.innerText = '{label_display}';
+                if (progEl) progEl.style.width = '{pct}%';
             }}
         }})();
         """

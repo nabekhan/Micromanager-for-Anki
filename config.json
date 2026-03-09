@@ -1,10 +1,11 @@
 {
     "is_locked": false,
-    "saved_mode": "cards",
-    "saved_target": 1,
+    "saved_mode": "finish_deck",
+    "saved_target": 17,
     "saved_current": 0,
     "saved_password": "",
     "use_password": true,
     "lock_type": "none",
-    "custom_password": "default"
+    "custom_password": "default",
+    "locked_deck_id": 1772753839200
 }

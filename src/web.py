@@ -99,17 +99,3 @@ HUD_HTML_TEMPLATE = """
     </div>
 </div>
 """
-
-HUD_JS = """
-window.updateForceHud = function(text, label, pct) {
-    const hud = document.getElementById('force-hud-container');
-    if (!hud) return;
-    document.getElementById('val-display').innerText = text;
-    document.getElementById('lbl-display').innerText = label;
-    document.getElementById('force-hud-progress').style.width = pct + '%';
-};
-window.removeForceHud = function() {
-    const hud = document.getElementById('force-hud-container');
-    if (hud) hud.parentNode.removeChild(hud);
-};
-"""

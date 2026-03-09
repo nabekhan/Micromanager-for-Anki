@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Anki" type="ShConfigurationType">
-    <option name="SCRIPT_TEXT" value="/Applications/Anki.app/Contents/MacOS/launcher" />
+    <option name="SCRIPT_TEXT" value="zip -r Micromanager.ankiaddon * -x &quot;*.DS_Store&quot; -x &quot;*__pycache__*&quot; -x &quot;meta.json&quot; -x &quot;.venv/*&quot; -x &quot;.git/*&quot; -x &quot;*gitignore&quot; -x &quot;*readme.md&quot; &amp;&amp; /Applications/Anki.app/Contents/MacOS/launcher" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />
