@@ -2,11 +2,11 @@
 
 **Micromanager** is a productivity enforcement add-on designed to eliminate distractions by locking you into your Anki study sessions until a specific goal is met. It employs aggressive "focus-yanking" and window management to ensure you don't stray from your decks.
 
-Inspiration: https://ankiweb.net/shared/info/1356589749 and https://getcoldturkey.com/micromanager/
+Inspiration: [FocusForce](https://ankiweb.net/shared/info/1356589749) and [Micromanager](https://getcoldturkey.com/micromanager/)
 
 Loved FocusForce but it was buggy and didnt do everything I needed it to. Given that it has not been updated in a while I went ahead and made numerous changes. Please message me if you want this removed.
 
-Code: https://github.com/nabekhan/Micromanager-for-Anki/tree/main
+Code: [Github](https://github.com/nabekhan/Micromanager-for-Anki/tree/main)
 
 ---
 
@@ -56,4 +56,3 @@ While a session is active, a persistent Heads-Up Display (HUD) appears at the to
 * **Progress Bar**: Visually tracks how close you are to your goal.
 * **Status Label**: Shows your current count (e.g., "15 CARDS LEFT" or "05:00 TIMER").
 * **Quick Actions**: Includes a settings icon to adjust the current session and an "X" button to attempt an early unlock.
-
