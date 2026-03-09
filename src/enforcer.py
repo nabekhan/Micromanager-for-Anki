@@ -81,7 +81,7 @@ class AnkiLock:
             self.active = True
             mw.form.actionAdd_ons.setEnabled(False)
             self.timer.start(200)
-            tooltip("Micromanager: Session Restored (Persistence Active)")
+            tooltip("Micromanager: Session Restored")
             mw.showMaximized()
 
     def update_persistence(self):
@@ -107,7 +107,7 @@ class AnkiLock:
     # NEW: The Gatekeeper function. Prevents opening settings if on the home screen.
     def request_settings(self):
         if not self.active and mw.state not in ["overview", "review"]:
-            showWarning("Please select and enter a deck first before activating Micromanager.")
+            tooltip("Please select a deck first before activating Micromanager")
             return
         ui.open_settings(self, is_update=self.active)
 
@@ -247,7 +247,7 @@ class AnkiLock:
             QApplication.beep()
             tooltip("Micromanager: Session Complete.", period=3000)
         else:
-            tooltip("Micromanager: Lock Stopped")
+            tooltip("Micromanager: Stopped")
 
     def get_current_display_values(self):
         text_display = "0"
@@ -308,7 +308,7 @@ class AnkiLock:
         if self.locked_deck_id is not None and mw.state in ["overview", "review"]:
             if mw.col.decks.get_current_id() != self.locked_deck_id:
                 mw.moveToState("deckBrowser")
-                tooltip(f"Micromanager: You are locked to your previous deck until your goal is met! (Deck ID: {self.locked_deck_id})", period=3000)
+                tooltip(f"Micromanager: You are locked to your selected deck until your goal is met! (Deck ID: {self.locked_deck_id})", period=3000)
 
         # Check if the daily reviews have been completely cleared
         if self.mode == "finish_reviews" and mw.state == "review":
