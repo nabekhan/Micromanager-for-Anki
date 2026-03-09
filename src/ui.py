@@ -27,6 +27,7 @@ class EventBlocker(QObject):
 def open_settings(addon, is_update=False):
     """Builds and displays the main, streamlined configuration window."""
     mw.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+    mw.showMaximized()
 
     d = QDialog(mw)
     d.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
