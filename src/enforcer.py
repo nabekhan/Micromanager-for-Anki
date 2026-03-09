@@ -140,7 +140,7 @@ class AnkiLock:
             elif self.rb_lock_random.isChecked():
                 self.lock_type = "random"
                 import string, random
-                chars = string.ascii_letters + string.digits + "!@#$%^&*"
+                chars = string.ascii_letters + string.digits
                 self.password = ''.join(random.choices(chars, k=200))
             else:
                 self.lock_type = "none"
