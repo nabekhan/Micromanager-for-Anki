@@ -361,3 +361,60 @@ def open_unlock_dialog(lock_type, expected_password):
     d.setLayout(layout)
 
     return d.exec() == QDialog.DialogCode.Accepted
+
+
+def open_confirm_quit_dialog():
+    """A custom confirmation dialog to bypass macOS native message box quirks."""
+    d = QDialog(mw)
+    d.setWindowTitle("Unlock")
+    d.setMinimumWidth(350)
+
+    # Inject the TopMost flag so the anti-cheat shield holds
+    d.setWindowFlags(d.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+
+    is_night = theme_manager.night_mode
+    if is_night:
+        dlg_bg, dlg_fg = "#2b2b2b", "white"
+    else:
+        dlg_bg, dlg_fg = "#ececec", "black"
+
+    d.setStyleSheet(f"""
+        QDialog {{ background-color: {dlg_bg}; color: {dlg_fg}; }}
+        QLabel {{ color: {dlg_fg}; font-size: 14px; font-weight: bold; }}
+        QPushButton {{ border-radius: 6px; border: none; font-weight: bold; padding: 8px 16px; font-size: 13px; color: white; min-width: 60px; }}
+        #btnNo {{ background-color: #3498db; }}
+        #btnNo:hover {{ background-color: #2980b9; }}
+        #btnYes {{ background-color: #e74c3c; }}
+        #btnYes:hover {{ background-color: #c0392b; }}
+    """)
+
+    layout = QVBoxLayout()
+    layout.setContentsMargins(20, 25, 20, 20)
+    layout.setSpacing(20)
+
+    lbl = QLabel("Are you sure you want to abort your session early?")
+    lbl.setWordWrap(True)
+    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    layout.addWidget(lbl)
+
+    btn_layout = QHBoxLayout()
+    btn_layout.addStretch()
+
+    btn_no = QPushButton("No")
+    btn_no.setObjectName("btnNo")
+    btn_no.setDefault(True)
+    btn_no.clicked.connect(d.reject)
+
+    btn_yes = QPushButton("Yes")
+    btn_yes.setObjectName("btnYes")
+    btn_yes.clicked.connect(d.accept)
+
+    # Standard macOS button order (No on left, Yes on right)
+    btn_layout.addWidget(btn_no)
+    btn_layout.addWidget(btn_yes)
+    btn_layout.addStretch()
+
+    layout.addLayout(btn_layout)
+    d.setLayout(layout)
+
+    return d.exec() == QDialog.DialogCode.Accepted

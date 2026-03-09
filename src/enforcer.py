@@ -315,15 +315,50 @@ class AnkiLock:
         # Check for open dialogs right away
         modal = QApplication.activeModalWidget()
 
-        # === 1. OS FIGHTING: Anti-Minimize ===
+        # === OS FIGHTING: Intelligent Focus & Anti-Minimize ===
+        # Get whatever window the user is currently interacting with
+        current_active = QApplication.activeWindow()
+        modal = QApplication.activeModalWidget()
+
+        # 1. If Anki is minimized, bring the main window back up
         if mw.isMinimized():
             mw.showMaximized()
-            # If a dialog is open, make sure raising the main window doesn't bury it
             if modal:
                 modal.raise_()
                 modal.activateWindow()
+            elif current_active:
+                current_active.raise_()
+                current_active.activateWindow()
             else:
                 mw.activateWindow()
+
+        # 2. Re-assert TopMost status gently (throttled)
+        if not hasattr(self, '_window_tick_counter'): self._window_tick_counter = 0
+        self._window_tick_counter += 1
+
+        if self._window_tick_counter >= 15:
+            self._window_tick_counter = 0
+
+            # CRITICAL FIX: DO NOT alter window flags if a modal dialog is open.
+            # Altering flags breaks the .exec() event loop of QDialogs.
+            if not modal:
+                # Only enforce TopMost on the Main Window (mw).
+                # Avoid dynamically applying it to random sub-windows/dropdowns.
+                if mw.isVisible():
+                    flags = mw.windowFlags()
+                    if not (flags & Qt.WindowType.WindowStaysOnTopHint):
+                        mw.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
+                        mw.show()
+
+        # 3. Focus Yanking: If Anki loses focus entirely (user alt-tabs)
+        if current_active is None:
+            if modal:
+                modal.activateWindow()
+                modal.raise_()
+            else:
+                top_widget = QApplication.topLevelAt(QCursor.pos()) or mw
+                top_widget.activateWindow()
+                top_widget.raise_()
 
         # === 2. DECK LOCK LOGIC ===
         if self.locked_deck_id is None and mw.state in ["overview", "review"]:
@@ -361,36 +396,6 @@ class AnkiLock:
                     self.stop_lock(success=True)
                     return
                 self.update_webview()
-
-        # === 4. OS FIGHTING: Window TopMost & Focus Yanking ===
-        if not hasattr(self, '_window_tick_counter'): self._window_tick_counter = 0
-        self._window_tick_counter += 1
-
-        # Throttled to run every ~3 seconds (15 ticks) to avoid freezing macOS
-        if self._window_tick_counter >= 15:
-            self._window_tick_counter = 0
-
-            # CRITICAL FIX: Only apply TopMost flags if NO pop-up dialog is active.
-            # Changing window flags breaks the modal event loop of active QDialogs.
-            if not modal:
-                for widget in QApplication.topLevelWidgets():
-                    if not widget.isVisible():
-                        continue
-                    if isinstance(widget, (QMainWindow, QDialog)):
-                        flags = widget.windowFlags()
-                        if not (flags & Qt.WindowType.WindowStaysOnTopHint):
-                            widget.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
-                            widget.show()
-
-        # Instant focus yanking if you click away
-        active = QApplication.activeWindow()
-        if active is None:
-            if modal:
-                modal.activateWindow()
-                modal.raise_()
-            else:
-                mw.activateWindow()
-                mw.raise_()
 
     def on_answer(self, reviewer, card, ease):
         if not self.active: return
@@ -465,16 +470,8 @@ class AnkiLock:
 
         if message == "force_unlock":
             if self.lock_type == "none":
-                # Construct the box manually to inject the TopMost flag BEFORE it runs
-                msg = QMessageBox(mw)
-                msg.setWindowTitle('Unlock')
-                msg.setText('Are you sure you want to abort your session early?')
-                msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                msg.setDefaultButton(QMessageBox.StandardButton.No)
-                msg.setWindowFlags(msg.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-
-                reply = msg.exec()
-                if reply == QMessageBox.StandardButton.Yes:
+                # Use our custom UI to bypass the macOS native popup icon bug
+                if ui.open_confirm_quit_dialog():
                     self.stop_lock(success=False)
             else:
                 unlocked = ui.open_unlock_dialog(self.lock_type, self.password)
