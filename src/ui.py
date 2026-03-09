@@ -154,7 +154,7 @@ def open_settings(addon, is_update=False):
         addon.rb_lock_none.setChecked(True)
 
     addon.txt_pass = QLineEdit()
-    # addon.txt_pass.setEchoMode(QLineEdit.EchoMode.Password)
+    addon.txt_pass.setEchoMode(QLineEdit.EchoMode.Password)
     addon.txt_pass.setFixedWidth(200)
     addon.txt_pass.setFixedHeight(28)
 
