@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: anki-mac-helper
+Version: 0.1.1
+Summary: Small support library for Anki on Macs
+Project-URL: Homepage, https://github.com/ankitects/anki
+Author: Anki Team
+License: AGPL-3.0-or-later
+Requires-Python: >=3.9

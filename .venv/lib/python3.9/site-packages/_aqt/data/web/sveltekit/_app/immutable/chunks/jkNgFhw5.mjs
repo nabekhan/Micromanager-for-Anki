@@ -1,0 +1,1 @@
+import{o as r,q as c,w as s,V as i,L as h,M as p,E as d}from"./D0Kcqh4a.mjs";function u(o,t,f){r&&c();var n=o,a,e;s(()=>{a!==(a=t())&&(e&&(p(e),e=null),a&&(e=h(()=>f(n,a))))},i),r&&(n=d)}export{u as c};

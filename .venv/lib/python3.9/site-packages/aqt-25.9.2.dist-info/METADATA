@@ -1,0 +1,44 @@
+Metadata-Version: 2.4
+Name: aqt
+Version: 25.9.2
+License-Expression: AGPL-3.0-or-later
+Requires-Python: >=3.9
+Requires-Dist: anki-mac-helper>=0.1.1; sys_platform == 'darwin'
+Requires-Dist: beautifulsoup4
+Requires-Dist: flask
+Requires-Dist: flask-cors
+Requires-Dist: jsonschema
+Requires-Dist: pip-system-certs!=5.1
+Requires-Dist: pyqt6-webengine>=6.2
+Requires-Dist: pyqt6>=6.2
+Requires-Dist: pywin32; sys_platform == 'win32'
+Requires-Dist: requests
+Requires-Dist: send2trash
+Requires-Dist: waitress>=2.0.0
+Requires-Dist: anki==25.09.2
+Provides-Extra: audio
+Requires-Dist: anki-audio==0.1.0; (sys_platform == 'win32' or sys_platform == 'darwin') and extra == 'audio'
+Provides-Extra: qt
+Requires-Dist: pyqt6-qt6==6.9.1; extra == 'qt'
+Requires-Dist: pyqt6-sip==13.10.2; extra == 'qt'
+Requires-Dist: pyqt6-webengine-qt6==6.8.2; extra == 'qt'
+Requires-Dist: pyqt6-webengine==6.8.0; extra == 'qt'
+Requires-Dist: pyqt6==6.9.1; extra == 'qt'
+Provides-Extra: qt66
+Requires-Dist: pyqt6-qt6==6.6.2; extra == 'qt66'
+Requires-Dist: pyqt6-sip==13.6.0; extra == 'qt66'
+Requires-Dist: pyqt6-webengine-qt6==6.6.2; extra == 'qt66'
+Requires-Dist: pyqt6-webengine==6.6.0; extra == 'qt66'
+Requires-Dist: pyqt6==6.6.1; extra == 'qt66'
+Provides-Extra: qt67
+Requires-Dist: pyqt6-qt6==6.7.3; extra == 'qt67'
+Requires-Dist: pyqt6-sip==13.10.2; extra == 'qt67'
+Requires-Dist: pyqt6-webengine-qt6==6.7.3; extra == 'qt67'
+Requires-Dist: pyqt6-webengine==6.7.0; extra == 'qt67'
+Requires-Dist: pyqt6==6.7.1; extra == 'qt67'
+Provides-Extra: qt68
+Requires-Dist: pyqt6-qt6==6.8.1; extra == 'qt68'
+Requires-Dist: pyqt6-sip==13.10.2; extra == 'qt68'
+Requires-Dist: pyqt6-webengine-qt6==6.8.1; extra == 'qt68'
+Requires-Dist: pyqt6-webengine==6.8.0; extra == 'qt68'
+Requires-Dist: pyqt6==6.8.0; extra == 'qt68'
