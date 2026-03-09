@@ -246,7 +246,7 @@ class AnkiLock:
 
         if success:
             QApplication.beep()
-            tooltip("Micromanager: Goal Reached! Session Complete.", period=3000)
+            tooltip("Micromanager: Session Complete.", period=3000)
         else:
             tooltip("Micromanager: Lock Stopped")
 
@@ -309,7 +309,7 @@ class AnkiLock:
         if self.locked_deck_id is not None and mw.state in ["overview", "review"]:
             if mw.col.decks.get_current_id() != self.locked_deck_id:
                 mw.moveToState("deckBrowser")
-                tooltip(f"Micromanager: You are locked to your previous deck until your goal is met! ({self.locked_deck_id})", period=3000)
+                tooltip(f"Micromanager: You are locked to your previous deck until your goal is met! (Deck ID: {self.locked_deck_id})", period=3000)
 
         # Check if the daily reviews have been completely cleared
         if self.mode == "finish_reviews" and mw.state == "review":
@@ -397,15 +397,25 @@ class AnkiLock:
         js_cmd = f"""
         (function(){{
             var hud = document.getElementById('force-hud-container');
-            if (!hud) {{
+            if (!hud || !window.updateForceHud) {{
+                // Remove old zombie HUD if it exists but is broken
+                if (hud) hud.remove();
+
+                // Re-inject Style
                 var s = document.createElement('style');
                 s.textContent = '{raw_css}';
                 document.head.appendChild(s);
+
+                // Re-inject HTML
                 var d = document.createElement('div');
                 d.innerHTML = '{safe_html}';
                 document.body.appendChild(d);
+
+                // Re-inject JS Functions
                 {HUD_JS}
             }}
+
+            // Final check to ensure the function exists before calling
             if(window.updateForceHud) {{
                 window.updateForceHud('{text_display}', '{label_display}', {pct});
             }}
