@@ -27,7 +27,7 @@ def get_hud_css_rules():
     return f"""
     #force-hud-container {{
         position: fixed !important;
-        top: 0 !important;
+        bottom: 0 !important;
         left: 0 !important;
         width: 100vw !important;
         height: 44px !important;
