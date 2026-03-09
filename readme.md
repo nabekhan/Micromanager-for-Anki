@@ -39,7 +39,7 @@ Sessions can be configured based on four distinct targets:
 * **Total Reviews**: Complete a specific number of card reviews.
 * **Correct Answers**: Stay locked in until you have answered a specific number of cards correctly.
 * **Time (Minutes)**: A countdown timer that unlocks once the allotted time has expired.
-* **Daily Reviews**: Locks you in until all currently due reviews in the selected deck are cleared.
+* **Reviews Due**: Locks you in until all currently due reviews in the selected deck are cleared.
 
 ---
 

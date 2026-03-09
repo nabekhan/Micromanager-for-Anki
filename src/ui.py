@@ -67,7 +67,7 @@ def open_settings(addon, is_update=False):
     addon.rb_cards = QRadioButton("Total Reviews")
     addon.rb_correct = QRadioButton("Correct Answers")
     addon.rb_time = QRadioButton("Time (Minutes)")
-    addon.rb_finish = QRadioButton("Daily Reviews")
+    addon.rb_finish = QRadioButton("Reviews Due")
 
     if addon.mode == "time":
         addon.rb_time.setChecked(True)
