@@ -10,7 +10,6 @@ from .config import load_config, save_config
 from .web import get_hud_css_rules, HUD_HTML_TEMPLATE, HUD_JS
 from . import ui
 
-
 class AnkiLock:
     def __init__(self):
         self.active = False
