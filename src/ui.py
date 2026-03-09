@@ -1,10 +1,7 @@
 # ui.py
-import random
-import string
 from aqt import mw
 from aqt.qt import *
 from aqt.theme import theme_manager
-from aqt.utils import tooltip
 
 
 class EventBlocker(QObject):
@@ -33,6 +30,7 @@ def open_settings(addon, is_update=False):
     mw.showMaximized()
 
     d = QDialog(mw)
+    d.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
     d.setWindowTitle("Micromanager")
     d.setMinimumWidth(400)
 

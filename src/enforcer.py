@@ -4,7 +4,7 @@ from aqt.qt import *
 from aqt import gui_hooks
 from aqt.utils import tooltip
 from aqt.reviewer import Reviewer
-
+import string, random
 from .config import load_config, save_config
 from .web import get_hud_css_rules, HUD_HTML_TEMPLATE, HUD_JS
 from . import ui
@@ -26,9 +26,7 @@ class AnkiLock:
 
         self.password = ""
         self.lock_type = conf.get("lock_type", "none")
-        self.custom_password = conf.get("custom_password", "default")
-        if not self.custom_password:
-            self.custom_password = "default"
+        self.custom_password = conf.get("custom_password") or "default"
 
         self._needs_save = False
 
@@ -43,6 +41,8 @@ class AnkiLock:
 
         self.original_close_event = mw.closeEvent
         mw.closeEvent = self.on_close_attempt
+        self._window_tick_counter = 0
+        self._tick_counter = 0
 
         self.setup_menu()
 
@@ -149,7 +149,6 @@ class AnkiLock:
                 self.password = ""
             elif self.rb_lock_random.isChecked():
                 self.lock_type = "random"
-                import string, random
                 chars = string.ascii_letters + string.digits
                 self.password = ''.join(random.choices(chars, k=200))
             else:
@@ -333,7 +332,6 @@ class AnkiLock:
                 mw.activateWindow()
 
         # 2. Re-assert TopMost status gently (throttled)
-        if not hasattr(self, '_window_tick_counter'): self._window_tick_counter = 0
         self._window_tick_counter += 1
 
         if self._window_tick_counter >= 15:
@@ -382,7 +380,6 @@ class AnkiLock:
 
         # === 3. TIMER LOGIC ===
         if self.mode == "time":
-            if not hasattr(self, '_tick_counter'): self._tick_counter = 0
             self._tick_counter += 1
             if self._tick_counter >= 5:
                 self._tick_counter = 0
@@ -418,7 +415,8 @@ class AnkiLock:
 
     def on_undo(self, *args):
         if not self.active: return
-        if self.current_val > 0:
+        # Only reverse the counter for modes that track increments!
+        if self.mode in ("cards", "correct") and self.current_val > 0:
             self.current_val -= 1
         self.update_webview()
         self.update_persistence()
