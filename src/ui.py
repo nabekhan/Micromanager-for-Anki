@@ -27,7 +27,6 @@ class EventBlocker(QObject):
 def open_settings(addon, is_update=False):
     """Builds and displays the main, streamlined configuration window."""
     mw.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
-    mw.showMaximized()
 
     d = QDialog(mw)
     d.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
@@ -277,27 +276,23 @@ def open_unlock_dialog(lock_type, expected_password):
         txt_target = QTextEdit(expected_password)
         txt_target.setReadOnly(True)
         txt_target.setFixedHeight(80)
-        txt_target.setMaximumWidth(800)
+        # We removed setMaximumWidth so it can expand
         txt_target.setStyleSheet(
             f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
         txt_target.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
-        h_target = QHBoxLayout()
-        h_target.addWidget(txt_target)
-        h_target.addStretch()
-        layout.addLayout(h_target)
+        # Add directly to the main vertical layout
+        layout.addWidget(txt_target)
 
         txt_input = QTextEdit()
         txt_input.setFixedHeight(80)
-        txt_input.setMaximumWidth(800)
+        # We removed setMaximumWidth so it can expand
         txt_input.setStyleSheet(
             f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
         txt_input.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
 
-        h_input = QHBoxLayout()
-        h_input.addWidget(txt_input)
-        h_input.addStretch()
-        layout.addLayout(h_input)
+        # Add directly to the main vertical layout
+        layout.addWidget(txt_input)
 
         layout.addWidget(lbl_error)
 

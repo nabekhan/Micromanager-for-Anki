@@ -115,7 +115,6 @@ class AnkiLock:
         self._needs_save = False
         save_config({"is_locked": False})
 
-    # NEW: The Gatekeeper function. Prevents opening settings if on the home screen.
     def request_settings(self):
         if not self.active and mw.state not in ["overview", "review"]:
             tooltip("Please select a deck before activating Micromanager")
