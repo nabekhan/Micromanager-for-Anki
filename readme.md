@@ -25,8 +25,8 @@ When an enforcement session is active, Micromanager implements the following res
 
 You can choose how difficult it is to "break" a session early:
 
-* **No Lock**: Allows you to abort the session after a simple confirmation prompt.
-* **Locked (Blind)**: The most restrictive mode. There is no password bypass; you **must** complete the goal to unlock Anki.
+* **Unlocked**: Allows you to abort the session after a simple confirmation prompt.
+* **Locked**: The most restrictive mode. There is no password bypass; you **must** complete the goal to unlock Anki.
 * **Random Text**: Generates a 200-character string of random symbols and letters. You must type this string perfectly (with no copy-pasting allowed) to unlock early.
 * **Custom Password**: Requires a user-defined password to end the session.
 
@@ -49,7 +49,7 @@ Sessions can be configured based on four distinct targets:
 
 ---
 
-### **User Interface (The HUD)**
+### **User Interface**
 
 While a session is active, a persistent Heads-Up Display (HUD) appears at the top of the reviewer:
 
