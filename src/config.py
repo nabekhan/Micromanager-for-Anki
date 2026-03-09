@@ -42,5 +42,10 @@ def save_config(new_data):
     config = load_config()
     config.update(new_data)
 
+    # FORCE DISK WRITE: Bypass Anki's memory buffer to survive hard crashes
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4)
+
+    # Still update Anki's internal state just in case
     mw.addonManager.writeConfig(ADDON_ID, config)
     return config

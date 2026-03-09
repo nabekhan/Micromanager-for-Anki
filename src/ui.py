@@ -29,9 +29,6 @@ class EventBlocker(QObject):
 
 def open_settings(addon, is_update=False):
     """Builds and displays the main, streamlined configuration window."""
-    if is_update:
-        addon.timer.stop()
-
     mw.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
     mw.showMaximized()
 
@@ -111,11 +108,12 @@ def open_settings(addon, is_update=False):
     addon.rb_finish.toggled.connect(update_ui_limits)
     update_ui_limits()
 
+    if addon.mode == "time" and addon.initial_minutes > 0:
+        addon.spin_val.setValue(addon.initial_minutes)
+    elif addon.target_val > 0:
+        addon.spin_val.setValue(addon.target_val)
+
     if is_update:
-        if addon.mode == "time":
-            addon.spin_val.setValue(addon.initial_minutes)
-        else:
-            addon.spin_val.setValue(addon.target_val)
         addon.rb_cards.setEnabled(False)
         addon.rb_correct.setEnabled(False)
         addon.rb_time.setEnabled(False)
@@ -224,9 +222,6 @@ def open_settings(addon, is_update=False):
     d.setLayout(layout)
     d.exec()
 
-    if is_update and addon.active:
-        addon.timer.start(200)
-
 
 def open_unlock_dialog(lock_type, expected_password):
     """Smart unlock dialog that adapts based on the lock type."""
@@ -253,7 +248,7 @@ def open_unlock_dialog(lock_type, expected_password):
     layout = QVBoxLayout()
     layout.setContentsMargins(20, 20, 20, 20)
     layout.setSpacing(15)
-    layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # Prevents wild vertical stretching
+    layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
     lbl_error = QLabel("")
     lbl_error.setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 13px;")
@@ -283,22 +278,29 @@ def open_unlock_dialog(lock_type, expected_password):
 
         txt_target = QTextEdit(expected_password)
         txt_target.setReadOnly(True)
-        txt_target.setMaximumHeight(80)
-        txt_target.setMaximumWidth(800)  # Prevents infinite horizontal stretch
+        txt_target.setFixedHeight(80)
+        txt_target.setMaximumWidth(800)
         txt_target.setStyleSheet(
             f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
-
         txt_target.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        layout.addWidget(txt_target)
+
+        h_target = QHBoxLayout()
+        h_target.addWidget(txt_target)
+        h_target.addStretch()
+        layout.addLayout(h_target)
 
         txt_input = QTextEdit()
-        txt_input.setMaximumHeight(80)
-        txt_input.setMaximumWidth(800)  # Prevents infinite horizontal stretch
+        txt_input.setFixedHeight(80)
+        txt_input.setMaximumWidth(800)
         txt_input.setStyleSheet(
             f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
-
         txt_input.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
-        layout.addWidget(txt_input)
+
+        h_input = QHBoxLayout()
+        h_input.addWidget(txt_input)
+        h_input.addStretch()
+        layout.addLayout(h_input)
+
         layout.addWidget(lbl_error)
 
         btn_unlock = QPushButton("Unlock")
@@ -318,13 +320,16 @@ def open_unlock_dialog(lock_type, expected_password):
         d.filter = EventBlocker(block_enter=True, block_paste=True, enter_callback=attempt_unlock, parent=d)
         txt_input.installEventFilter(d.filter)
 
+        # Auto-focus the input box
+        txt_input.setFocus()
+
     elif lock_type == "custom":
         lbl = QLabel("Enter password to quit:")
         layout.addWidget(lbl)
 
         txt_input = QLineEdit()
         txt_input.setEchoMode(QLineEdit.EchoMode.Password)
-        txt_input.setMaximumWidth(400)  # Restricts text box width
+        txt_input.setMaximumWidth(400)
         txt_input.setStyleSheet(
             f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px;")
         layout.addWidget(txt_input)
@@ -348,6 +353,10 @@ def open_unlock_dialog(lock_type, expected_password):
         d.filter = EventBlocker(block_enter=True, block_paste=False, enter_callback=attempt_unlock, parent=d)
         txt_input.installEventFilter(d.filter)
 
+        # Auto-focus the input box
+        txt_input.setFocus()
+
+    layout.addStretch()
     layout.addLayout(btn_layout)
     d.setLayout(layout)
 

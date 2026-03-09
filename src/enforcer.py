@@ -1,24 +1,30 @@
 # enforcer.py
-import time
 from aqt import mw
 from aqt.qt import *
 from aqt import gui_hooks
-from aqt.utils import tooltip, showWarning
+from aqt.utils import tooltip
 from aqt.reviewer import Reviewer
 
 from .config import load_config, save_config
 from .web import get_hud_css_rules, HUD_HTML_TEMPLATE, HUD_JS
 from . import ui
 
+
 class AnkiLock:
     def __init__(self):
         self.active = False
-        self.mode = "cards"
-        self.target_val = 0
-        self.current_val = 0
-        self.initial_minutes = 0
-        self.password = ""
+
+        # FIX: Load history immediately so settings persist between unlocked sessions
         conf = load_config()
+        self.mode = conf.get("saved_mode", "cards")
+        self.target_val = conf.get("saved_target", 0)
+        self.current_val = 0
+
+        self.initial_minutes = 0
+        if self.mode == "time" and self.target_val > 0:
+            self.initial_minutes = self.target_val // 60
+
+        self.password = ""
         self.lock_type = conf.get("lock_type", "none")
         self.custom_password = conf.get("custom_password", "default")
         if not self.custom_password:
@@ -78,6 +84,11 @@ class AnkiLock:
             self.password = conf.get("saved_password", "")
             self.lock_type = conf.get("lock_type", "none")
             self.locked_deck_id = conf.get("locked_deck_id", None)
+
+            # Restore initial minutes so the settings UI displays correctly
+            if self.mode == "time":
+                self.initial_minutes = self.target_val // 60
+
             self.active = True
             mw.form.actionAdd_ons.setEnabled(False)
             self.timer.start(200)
@@ -126,7 +137,7 @@ class AnkiLock:
 
                 # Check for empty password BEFORE overwriting anything
                 if not temp_pass:
-                    showWarning("Password cannot be empty!")
+                    tooltip("Password cannot be empty!")
                     return
 
                 self.lock_type = "custom"
@@ -176,7 +187,7 @@ class AnkiLock:
             self.target_val = counts[2] if counts and len(counts) >= 3 else 0
 
             if self.target_val == 0:
-                showWarning("No reviews are currently due in this deck! Lock aborted.")
+                tooltip("No reviews are currently due in this deck! Lock aborted.")
                 return
 
             self.current_val = 0  # Unused for this mode, but keeps state clean
@@ -252,32 +263,39 @@ class AnkiLock:
         text_display = "0"
         label_display = "LOCKED"
         pct = 0
+        remaining = 0
 
+        # 1. Determine Values
         if self.mode == "time":
             mins = int(self.current_val / 60)
             secs = self.current_val % 60
             text_display = f"{mins:02d}:{secs:02d}"
             label_display = "TIMER"
-            pct = 100 if self.target_val == 0 else ((self.target_val - self.current_val) / self.target_val) * 100
+            remaining = self.target_val - self.current_val
 
         elif self.mode == "correct":
             remaining = self.target_val - self.current_val
             text_display = str(max(0, remaining))
             label_display = "CORRECT LEFT"
-            pct = 100 if self.target_val == 0 else (self.current_val / self.target_val) * 100
 
         elif self.mode == "finish_reviews":
             counts = mw.col.sched.counts()
             remaining = counts[2] if counts and len(counts) >= 3 else 0
             text_display = str(remaining)
             label_display = "REVIEWS LEFT"
-            pct = 100 if self.target_val == 0 else ((self.target_val - remaining) / self.target_val) * 100
 
-        else:
+        else: # cards
             remaining = self.target_val - self.current_val
             text_display = str(max(0, remaining))
             label_display = "CARDS LEFT"
-            pct = 100 if self.target_val == 0 else (self.current_val / self.target_val) * 100
+
+        # 2. Calculate Percentage once
+        if self.target_val == 0:
+            pct = 100
+        elif self.mode in ("time", "finish_reviews"):
+            pct = (remaining / self.target_val) * 100
+        else: # correct, cards
+            pct = (self.current_val / self.target_val) * 100
 
         return text_display, label_display, max(0, min(100, pct))
 
@@ -294,10 +312,18 @@ class AnkiLock:
     def on_tick(self):
         if not self.active: return
 
+        # Check for open dialogs right away
+        modal = QApplication.activeModalWidget()
+
         # === 1. OS FIGHTING: Anti-Minimize ===
         if mw.isMinimized():
             mw.showMaximized()
-            mw.activateWindow()
+            # If a dialog is open, make sure raising the main window doesn't bury it
+            if modal:
+                modal.raise_()
+                modal.activateWindow()
+            else:
+                mw.activateWindow()
 
         # === 2. DECK LOCK LOGIC ===
         if self.locked_deck_id is None and mw.state in ["overview", "review"]:
@@ -307,7 +333,9 @@ class AnkiLock:
         if self.locked_deck_id is not None and mw.state in ["overview", "review"]:
             if mw.col.decks.get_current_id() != self.locked_deck_id:
                 mw.moveToState("deckBrowser")
-                tooltip(f"Micromanager: You are locked to your selected deck until your goal is met! (Deck ID: {self.locked_deck_id})", period=3000)
+                tooltip(
+                    f"Micromanager: You are locked to your selected deck until your goal is met! (Deck ID: {self.locked_deck_id})",
+                    period=3000)
 
         # Check if the daily reviews have been completely cleared
         if self.mode == "finish_reviews" and mw.state == "review":
@@ -325,8 +353,9 @@ class AnkiLock:
                 self._tick_counter = 0
                 self.current_val -= 1
 
-                if self.current_val % 60 == 0:
-                    self.update_persistence()
+                # Update persistence every single second.
+                # The save_timer will automatically batch this to the disk every 10 seconds.
+                self.update_persistence()
 
                 if self.current_val <= 0:
                     self.stop_lock(success=True)
@@ -340,20 +369,28 @@ class AnkiLock:
         # Throttled to run every ~3 seconds (15 ticks) to avoid freezing macOS
         if self._window_tick_counter >= 15:
             self._window_tick_counter = 0
-            for widget in QApplication.topLevelWidgets():
-                if not widget.isVisible():
-                    continue
-                if isinstance(widget, (QMainWindow, QDialog)):
-                    flags = widget.windowFlags()
-                    if not (flags & Qt.WindowType.WindowStaysOnTopHint):
-                        widget.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
-                        widget.show()
+
+            # CRITICAL FIX: Only apply TopMost flags if NO pop-up dialog is active.
+            # Changing window flags breaks the modal event loop of active QDialogs.
+            if not modal:
+                for widget in QApplication.topLevelWidgets():
+                    if not widget.isVisible():
+                        continue
+                    if isinstance(widget, (QMainWindow, QDialog)):
+                        flags = widget.windowFlags()
+                        if not (flags & Qt.WindowType.WindowStaysOnTopHint):
+                            widget.setWindowFlags(flags | Qt.WindowType.WindowStaysOnTopHint)
+                            widget.show()
 
         # Instant focus yanking if you click away
         active = QApplication.activeWindow()
         if active is None:
-            mw.activateWindow()
-            mw.raise_()
+            if modal:
+                modal.activateWindow()
+                modal.raise_()
+            else:
+                mw.activateWindow()
+                mw.raise_()
 
     def on_answer(self, reviewer, card, ease):
         if not self.active: return
@@ -427,25 +464,22 @@ class AnkiLock:
             return (True, None)
 
         if message == "force_unlock":
-            self.timer.stop()
-
             if self.lock_type == "none":
-                reply = QMessageBox.question(
-                    mw, 'Unlock',
-                    'Are you sure you want to abort your session early?',
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No
-                )
+                # Construct the box manually to inject the TopMost flag BEFORE it runs
+                msg = QMessageBox(mw)
+                msg.setWindowTitle('Unlock')
+                msg.setText('Are you sure you want to abort your session early?')
+                msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                msg.setDefaultButton(QMessageBox.StandardButton.No)
+                msg.setWindowFlags(msg.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+
+                reply = msg.exec()
                 if reply == QMessageBox.StandardButton.Yes:
                     self.stop_lock(success=False)
-                else:
-                    self.timer.start(200)
             else:
                 unlocked = ui.open_unlock_dialog(self.lock_type, self.password)
                 if unlocked:
                     self.stop_lock(success=False)
-                else:
-                    self.timer.start(200)
 
             return (True, None)
 
