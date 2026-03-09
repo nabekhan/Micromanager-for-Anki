@@ -187,10 +187,9 @@ class AnkiLock:
             self.current_val = 0
             self.initial_minutes = 5
 
+        save_config({"saved_mode": self.mode})
         self.active = True
         mw.form.actionAdd_ons.setEnabled(False)
-
-        # We now guarantee they are inside a deck, so grab the ID instantly
         self.locked_deck_id = mw.col.decks.get_current_id()
 
         self.update_persistence()
