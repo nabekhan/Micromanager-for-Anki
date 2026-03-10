@@ -29,6 +29,7 @@ class AnkiLock:
         self.custom_password = conf.get("custom_password") or "default"
 
         self._needs_save = False
+        self._current_card_is_new = False
 
         self.locked_deck_id = None
 
@@ -57,7 +58,6 @@ class AnkiLock:
         gui_hooks.browser_will_show.append(self.on_secondary_window)
 
         QTimer.singleShot(1000, self.check_persistence)
-
 
     def on_secondary_window(self, window):
         if self.active:
@@ -178,6 +178,10 @@ class AnkiLock:
             self.target_val = val * 60
             self.current_val = self.target_val
         elif self.mode == "correct":
+            self.target_val = val
+            self.current_val = 0
+            self.initial_minutes = 5
+        elif self.mode == "new_cards":
             self.target_val = val
             self.current_val = 0
             self.initial_minutes = 5
@@ -307,7 +311,15 @@ class AnkiLock:
             if self.target_val > 0:
                 pct = (self.current_val / self.target_val) * 100
 
-        # 4. REVIEWS DUE (Bar grows from 0% -> 100%)
+        # 4. NEW CARDS ONLY (Bar grows from 0% -> 100%)
+        elif self.mode == "new_cards":
+            remaining = max(0, self.target_val - self.current_val)
+            text_display = str(remaining)
+            label_display = "NEW LEFT"
+            if self.target_val > 0:
+                pct = (self.current_val / self.target_val) * 100
+
+        # 5. REVIEWS DUE (Bar grows from 0% -> 100%)
         elif self.mode == "finish_reviews":
             counts = mw.col.sched.counts() if mw.col else None
             remaining = counts[2] if counts and len(counts) >= 3 else 0
@@ -322,7 +334,7 @@ class AnkiLock:
                 completed = self.target_val - remaining
                 pct = (completed / self.target_val) * 100
 
-        # 5. COMPLETE DECK (Bar grows from 0% -> 100%)
+        # 6. COMPLETE DECK (Bar grows from 0% -> 100%)
         elif self.mode == "finish_deck":
             counts = mw.col.sched.counts() if mw.col else None
             # FIX: Only count New (counts[0]) and Review (counts[2]). Ignore Learning!
@@ -452,6 +464,9 @@ class AnkiLock:
     def on_question_shown(self, card):
         if not self.active: return
 
+        # Track if the current card is new (type 0) for the new_cards goal
+        self._current_card_is_new = (card.type == 0)
+
         # Edge Case: The user suspended/buried a card, which alters due counts
         # without triggering on_answer. We check if they won the "finish_reviews" goal here.
         if self.mode == "finish_reviews":
@@ -495,6 +510,13 @@ class AnkiLock:
                 if self.current_val >= self.target_val:
                     self.stop_lock(success=True)
                     return
+        elif self.mode == "new_cards":
+            if getattr(self, "_current_card_is_new", False):
+                self.current_val += 1
+                self.update_persistence()
+                if self.current_val >= self.target_val:
+                    self.stop_lock(success=True)
+                    return
 
         self.update_webview()
 
@@ -523,7 +545,7 @@ class AnkiLock:
         js_cmd = f"""
         (function(){{
             var hud = document.getElementById('force-hud-container');
-            
+
             // If the HUD is missing, rebuild it from scratch
             if (!hud) {{
                 var s = document.createElement('style');
@@ -533,7 +555,7 @@ class AnkiLock:
                 var d = document.createElement('div');
                 d.innerHTML = '{safe_html}';
                 document.body.appendChild(d.firstElementChild);
-                
+
                 // Re-fetch the newly created HUD
                 hud = document.getElementById('force-hud-container');
             }}
@@ -543,7 +565,7 @@ class AnkiLock:
                 var valEl = document.getElementById('val-display');
                 var lblEl = document.getElementById('lbl-display');
                 var progEl = document.getElementById('force-hud-progress');
-                
+
                 if (valEl) valEl.innerText = '{text_display}';
                 if (lblEl) lblEl.innerText = '{label_display}';
                 if (progEl) progEl.style.width = '{pct}%';

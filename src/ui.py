@@ -59,14 +59,17 @@ def open_settings(addon, is_update=False):
     # FIX: Create as local variables, do not attach to `addon`
     rb_cards = QRadioButton("Total Reviews")
     rb_correct = QRadioButton("Correct Answers")
-    rb_time = QRadioButton("Time (Minutes)")
+    rb_new = QRadioButton("New Cards")
+    rb_time = QRadioButton("Time")
     rb_finish = QRadioButton("Reviews Due")
-    rb_finish_deck = QRadioButton("Complete Deck (All Cards)")
+    rb_finish_deck = QRadioButton("Complete Deck")
 
     if addon.mode == "time":
         rb_time.setChecked(True)
     elif addon.mode == "correct":
         rb_correct.setChecked(True)
+    elif addon.mode == "new_cards":
+        rb_new.setChecked(True)
     elif addon.mode == "finish_reviews":
         rb_finish.setChecked(True)
     elif addon.mode == "finish_deck":
@@ -93,7 +96,7 @@ def open_settings(addon, is_update=False):
         if rb_time.isChecked():
             spin_val.setRange(1, 480)
             lbl_suffix.setText("minutes")
-        elif rb_correct.isChecked():
+        elif rb_correct.isChecked() or rb_new.isChecked():
             spin_val.setRange(1, 5000)
             lbl_suffix.setText("cards")
         else:
@@ -102,6 +105,7 @@ def open_settings(addon, is_update=False):
 
     rb_cards.toggled.connect(update_ui_limits)
     rb_correct.toggled.connect(update_ui_limits)
+    rb_new.toggled.connect(update_ui_limits)
     rb_time.toggled.connect(update_ui_limits)
     rb_finish.toggled.connect(update_ui_limits)
     rb_finish_deck.toggled.connect(update_ui_limits)
@@ -115,6 +119,7 @@ def open_settings(addon, is_update=False):
     if is_update:
         rb_cards.setEnabled(False)
         rb_correct.setEnabled(False)
+        rb_new.setEnabled(False)
         rb_time.setEnabled(False)
         rb_finish.setEnabled(False)
         rb_finish_deck.setEnabled(False)
@@ -122,6 +127,7 @@ def open_settings(addon, is_update=False):
 
     lay_goal.addWidget(rb_cards)
     lay_goal.addWidget(rb_correct)
+    lay_goal.addWidget(rb_new)
     lay_goal.addWidget(rb_time)
     lay_goal.addWidget(rb_finish)
     lay_goal.addWidget(rb_finish_deck)
@@ -214,6 +220,7 @@ def open_settings(addon, is_update=False):
             'val': spin_val.value(),
             'mode': 'time' if rb_time.isChecked() else
                     'correct' if rb_correct.isChecked() else
+                    'new_cards' if rb_new.isChecked() else
                     'finish_reviews' if rb_finish.isChecked() else
                     'finish_deck' if rb_finish_deck.isChecked() else 'cards',
             'lock_type': 'custom' if rb_lock_custom.isChecked() else
@@ -304,22 +311,16 @@ def open_unlock_dialog(lock_type, expected_password):
         txt_target = QTextEdit(expected_password)
         txt_target.setReadOnly(True)
         txt_target.setFixedHeight(80)
-        # We removed setMaximumWidth so it can expand
         txt_target.setStyleSheet(
             f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
         txt_target.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-
-        # Add directly to the main vertical layout
         layout.addWidget(txt_target)
 
         txt_input = QTextEdit()
         txt_input.setFixedHeight(80)
-        # We removed setMaximumWidth so it can expand
         txt_input.setStyleSheet(
             f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
         txt_input.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
-
-        # Add directly to the main vertical layout
         layout.addWidget(txt_input)
 
         layout.addWidget(lbl_error)
@@ -341,7 +342,6 @@ def open_unlock_dialog(lock_type, expected_password):
         d.filter = EventBlocker(block_enter=True, block_paste=True, enter_callback=attempt_unlock, parent=d)
         txt_input.installEventFilter(d.filter)
 
-        # Auto-focus the input box
         txt_input.setFocus()
 
     elif lock_type == "custom":
@@ -374,7 +374,6 @@ def open_unlock_dialog(lock_type, expected_password):
         d.filter = EventBlocker(block_enter=True, block_paste=False, enter_callback=attempt_unlock, parent=d)
         txt_input.installEventFilter(d.filter)
 
-        # Auto-focus the input box
         txt_input.setFocus()
 
     layout.addStretch()
@@ -390,7 +389,6 @@ def open_confirm_quit_dialog():
     d.setWindowTitle("Unlock")
     d.setMinimumWidth(350)
 
-    # Inject the TopMost flag so the anti-cheat shield holds
     d.setWindowFlags(d.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
 
     is_night = theme_manager.night_mode
@@ -430,7 +428,6 @@ def open_confirm_quit_dialog():
     btn_yes.setObjectName("btnYes")
     btn_yes.clicked.connect(d.accept)
 
-    # Standard macOS button order (No on left, Yes on right)
     btn_layout.addWidget(btn_yes)
     btn_layout.addWidget(btn_no)
     btn_layout.addStretch()
