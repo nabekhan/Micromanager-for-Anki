@@ -86,6 +86,24 @@ class AnkiLock:
             self.password = conf.get("saved_password", "")
             self.lock_type = conf.get("lock_type", "none")
             self.locked_deck_id = conf.get("locked_deck_id", None)
+
+            # --- FIX: Prevent Percentage Glitch After Syncing ---
+            # If the user's due count grew while Anki was closed, update the
+            # target size so the math doesn't try to divide by a smaller number.
+            try:
+                counts = mw.col.sched.counts()
+                if self.mode == "finish_reviews":
+                    remaining = counts[2] if counts and len(counts) >= 3 else 0
+                    if remaining > self.target_val:
+                        self.target_val = remaining
+                elif self.mode == "finish_deck":
+                    remaining = (counts[0] + counts[2]) if counts else 0
+                    if remaining > self.target_val:
+                        self.target_val = remaining
+            except AttributeError:
+                pass
+                # ---------------------------------------------------
+
             self.save_timer.start(10000)
 
             # Restore initial minutes so the settings UI displays correctly
@@ -133,29 +151,17 @@ class AnkiLock:
         action.triggered.connect(self.request_settings)
         mw.form.menuTools.addAction(action)
 
-    def start_lock(self, dialog):
+    def start_lock(self, settings):
+        # FIX: We now unpack a safe dictionary passed from ui.py
+        self.lock_type = settings.get('lock_type', 'none')
 
-        if self.rb_lock_custom.isChecked():
-            temp_pass = self.txt_pass.text().strip()
-
-            # Check for empty password BEFORE overwriting anything
-            if not temp_pass:
-                tooltip("Password cannot be empty!")
-                return
-
-            self.lock_type = "custom"
-            self.password = temp_pass
-            self.custom_password = temp_pass
-
-        elif self.rb_lock_blind.isChecked():
-            self.lock_type = "blind"
-            self.password = ""
-        elif self.rb_lock_random.isChecked():
-            self.lock_type = "random"
+        if self.lock_type == "custom":
+            self.password = settings.get('password', '')
+            self.custom_password = self.password
+        elif self.lock_type == "random":
             chars = string.ascii_letters + string.digits
             self.password = ''.join(random.choices(chars, k=200))
         else:
-            self.lock_type = "none"
             self.password = ""
 
         save_config({
@@ -164,52 +170,45 @@ class AnkiLock:
         })
 
         self.locked_deck_id = None
+        self.mode = settings.get('mode', 'cards')
+        val = settings.get('val', 5)
 
-        val = self.spin_val.value()
-
-        if self.rb_time.isChecked():
-            self.mode = "time"
+        if self.mode == "time":
             self.initial_minutes = val
             self.target_val = val * 60
             self.current_val = self.target_val
-        elif self.rb_correct.isChecked():
-            self.mode = "correct"
+        elif self.mode == "correct":
             self.target_val = val
             self.current_val = 0
             self.initial_minutes = 5
-        elif getattr(self, 'rb_finish', None) and self.rb_finish.isChecked():
-            self.mode = "finish_reviews"
-
-            # Safely fetch counts
+        elif self.mode == "finish_reviews":
             try:
                 counts = mw.col.sched.counts()
                 self.target_val = counts[2] if counts and len(counts) >= 3 else 0
             except AttributeError:
                 self.target_val = 0
                 tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
-                return
+                return False
 
             if self.target_val == 0:
                 tooltip("No reviews are currently due in this deck! Lock aborted.")
-                return
+                return False
 
-            self.current_val = 0  # Unused for this mode, but keeps state clean
+            self.current_val = 0
             self.initial_minutes = 5
-        elif getattr(self, 'rb_finish_deck', None) and self.rb_finish_deck.isChecked():
-            self.mode = "finish_deck"
+        elif self.mode == "finish_deck":
             try:
-                # counts() returns a tuple: (new, learning, review)
-                # sum() adds all three together for the total deck load
                 counts = mw.col.sched.counts()
-                self.target_val = sum(counts) if counts else 0
+                # FIX: Set the initial goal using only New + Review
+                self.target_val = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
             except AttributeError:
                 self.target_val = 0
                 tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
-                return
+                return False
 
             if self.target_val == 0:
                 tooltip("No cards are currently due in this deck! Lock aborted.")
-                return
+                return False
 
             self.current_val = 0
             self.initial_minutes = 5
@@ -229,7 +228,6 @@ class AnkiLock:
         self.update_persistence()
         self.commit_persistence()
 
-        dialog.accept()
         QApplication.beep()
         self.timer.start(200)
 
@@ -240,6 +238,7 @@ class AnkiLock:
             mw.reset()
 
         QTimer.singleShot(300, self.update_webview)
+        return True
 
     def stop_lock(self, success=False):
         self.active = False
@@ -269,10 +268,6 @@ class AnkiLock:
             if (typeof removeForceHud === 'function') removeForceHud();
         """
 
-        if mw.reviewer.web:
-            mw.reviewer.web.eval(kill_js)
-
-        # Also clean the main webview just in case Anki transitioned screens too fast
         if mw.web:
             mw.web.eval(kill_js)
 
@@ -285,48 +280,66 @@ class AnkiLock:
     def get_current_display_values(self):
         text_display = "0"
         label_display = "LOCKED"
-        pct = 0
-        remaining = 0
+        pct = 0.0
 
-        # 1. Determine Values
+        # 1. TIME MODE (Bar shrinks from 100% -> 0%)
         if self.mode == "time":
             mins = int(self.current_val / 60)
             secs = self.current_val % 60
             text_display = f"{mins:02d}:{secs:02d}"
             label_display = "TIMER"
-            remaining = self.target_val - self.current_val
+            if self.target_val > 0:
+                pct = (self.current_val / self.target_val) * 100
 
+        # 2. CORRECT ANSWERS (Bar grows from 0% -> 100%)
         elif self.mode == "correct":
-            remaining = self.target_val - self.current_val
-            text_display = str(max(0, remaining))
+            remaining = max(0, self.target_val - self.current_val)
+            text_display = str(remaining)
             label_display = "CORRECT LEFT"
+            if self.target_val > 0:
+                pct = (self.current_val / self.target_val) * 100
 
+        # 3. TOTAL REVIEWS / CARDS (Bar grows from 0% -> 100%)
+        elif self.mode == "cards":
+            remaining = max(0, self.target_val - self.current_val)
+            text_display = str(remaining)
+            label_display = "CARDS LEFT"
+            if self.target_val > 0:
+                pct = (self.current_val / self.target_val) * 100
+
+        # 4. REVIEWS DUE (Bar grows from 0% -> 100%)
         elif self.mode == "finish_reviews":
-            counts = mw.col.sched.counts()
+            counts = mw.col.sched.counts() if mw.col else None
             remaining = counts[2] if counts and len(counts) >= 3 else 0
             text_display = str(remaining)
             label_display = "REVIEWS LEFT"
 
-        elif self.mode == "finish_deck":  # NEW
-            counts = mw.col.sched.counts()
-            remaining = sum(counts) if counts else 0
+            # If Anki dynamically adds reviews to the queue, push the goalpost back
+            if remaining > self.target_val:
+                self.target_val = remaining
+
+            if self.target_val > 0:
+                completed = self.target_val - remaining
+                pct = (completed / self.target_val) * 100
+
+        # 5. COMPLETE DECK (Bar grows from 0% -> 100%)
+        elif self.mode == "finish_deck":
+            counts = mw.col.sched.counts() if mw.col else None
+            # FIX: Only count New (counts[0]) and Review (counts[2]). Ignore Learning!
+            remaining = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
             text_display = str(remaining)
             label_display = "TOTAL LEFT"
 
-        else:  # cards
-            remaining = self.target_val - self.current_val
-            text_display = str(max(0, remaining))
-            label_display = "CARDS LEFT"
+            # If Anki dynamically adds to the queue, push the goalpost
+            if remaining > self.target_val:
+                self.target_val = remaining
 
-            # 2. Calculate Percentage once
-        if self.target_val == 0:
-            pct = 100
-        elif self.mode in ("time", "finish_reviews", "finish_deck"):
-            pct = (remaining / self.target_val) * 100
-        else:  # correct, cards
-            pct = (self.current_val / self.target_val) * 100
+            if self.target_val > 0:
+                completed = self.target_val - remaining
+                pct = (completed / self.target_val) * 100
 
-        return text_display, label_display, max(0, min(100, pct))
+        # Guarantee the CSS percentage never exceeds bounds
+        return text_display, label_display, max(0.0, min(100.0, pct))
 
     def inject_hud(self, content, context):
         if not isinstance(context, Reviewer) or not self.active: return
@@ -408,13 +421,17 @@ class AnkiLock:
                 self.stop_lock(success=True)
                 return
 
-        # Check if the entire deck is cleared
-        elif self.mode == "finish_deck" and mw.state == "review":
-            counts = mw.col.sched.counts()
-            remaining_total = sum(counts) if counts else 0
-            if remaining_total == 0:
-                self.stop_lock(success=True)
-                return
+            # Check if the entire deck is cleared (Inside both on_tick AND on_question_shown)
+        elif self.mode == "finish_deck":
+            try:
+                counts = mw.col.sched.counts()
+                # FIX: Only check if New and Review are zero
+                remaining_total = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
+                if remaining_total <= 0:
+                    self.stop_lock(success=True)
+                    return
+            except AttributeError:
+                pass
 
         # === 3. TIMER LOGIC ===
         if self.mode == "time":
@@ -447,10 +464,12 @@ class AnkiLock:
             except AttributeError:
                 pass
 
+            # Check if the entire deck is cleared (Inside both on_tick AND on_question_shown)
         elif self.mode == "finish_deck":
             try:
                 counts = mw.col.sched.counts()
-                remaining_total = sum(counts) if counts else 0
+                # FIX: Only check if New and Review are zero
+                remaining_total = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
                 if remaining_total <= 0:
                     self.stop_lock(success=True)
                     return
@@ -480,12 +499,15 @@ class AnkiLock:
         self.update_webview()
 
     def on_undo(self, *args):
+        return
+        """
         if not self.active: return
         if self.mode == "cards" and self.current_val > 0:
             self.current_val -= 1
 
         self.update_webview()
         self.update_persistence()
+        """
 
     def update_webview(self, *args, **kwargs):
         if not self.active: return
@@ -528,7 +550,7 @@ class AnkiLock:
             }}
         }})();
         """
-        mw.reviewer.web.eval(js_cmd)
+        mw.web.eval(js_cmd)
 
     def on_js_message(self, handled, message, context):
         if message == "force_config":

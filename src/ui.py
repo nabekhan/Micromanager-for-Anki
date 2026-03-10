@@ -56,73 +56,75 @@ def open_settings(addon, is_update=False):
     lay_goal.setContentsMargins(15, 15, 15, 15)
     lay_goal.setSpacing(10)
 
-    addon.rb_cards = QRadioButton("Total Reviews")
-    addon.rb_correct = QRadioButton("Correct Answers")
-    addon.rb_time = QRadioButton("Time (Minutes)")
-    addon.rb_finish = QRadioButton("Reviews Due")
-    addon.rb_finish_deck = QRadioButton("Complete Deck (All Cards)")  # NEW
+    # FIX: Create as local variables, do not attach to `addon`
+    rb_cards = QRadioButton("Total Reviews")
+    rb_correct = QRadioButton("Correct Answers")
+    rb_time = QRadioButton("Time (Minutes)")
+    rb_finish = QRadioButton("Reviews Due")
+    rb_finish_deck = QRadioButton("Complete Deck (All Cards)")
 
     if addon.mode == "time":
-        addon.rb_time.setChecked(True)
+        rb_time.setChecked(True)
     elif addon.mode == "correct":
-        addon.rb_correct.setChecked(True)
+        rb_correct.setChecked(True)
     elif addon.mode == "finish_reviews":
-        addon.rb_finish.setChecked(True)
-    elif addon.mode == "finish_deck":  # NEW
-        addon.rb_finish_deck.setChecked(True)
+        rb_finish.setChecked(True)
+    elif addon.mode == "finish_deck":
+        rb_finish_deck.setChecked(True)
     else:
-        addon.rb_cards.setChecked(True)
+        rb_cards.setChecked(True)
 
-    addon.spin_val = QSpinBox()
-    addon.spin_val.setMinimumWidth(80)
+    spin_val = QSpinBox()
+    spin_val.setMinimumWidth(80)
 
     lbl_suffix = QLabel("cards")
     lbl_suffix.setStyleSheet("font-weight: bold; font-size: 13px; margin-left: 5px;")
 
     h_spin = QHBoxLayout()
-    h_spin.addWidget(addon.spin_val)
+    h_spin.addWidget(spin_val)
     h_spin.addWidget(lbl_suffix)
     h_spin.addStretch()
 
     def update_ui_limits():
-        is_finish = addon.rb_finish.isChecked() or addon.rb_finish_deck.isChecked()
-        addon.spin_val.setVisible(not is_finish)
+        is_finish = rb_finish.isChecked() or rb_finish_deck.isChecked()
+        spin_val.setVisible(not is_finish)
         lbl_suffix.setVisible(not is_finish)
 
-        if addon.rb_time.isChecked():
-            addon.spin_val.setRange(1, 480)
+        if rb_time.isChecked():
+            spin_val.setRange(1, 480)
             lbl_suffix.setText("minutes")
-        elif addon.rb_correct.isChecked():
-            addon.spin_val.setRange(1, 5000)
+        elif rb_correct.isChecked():
+            spin_val.setRange(1, 5000)
             lbl_suffix.setText("cards")
         else:
-            addon.spin_val.setRange(1, 5000)
+            spin_val.setRange(1, 5000)
             lbl_suffix.setText("cards")
 
-    addon.rb_cards.toggled.connect(update_ui_limits)
-    addon.rb_correct.toggled.connect(update_ui_limits)
-    addon.rb_time.toggled.connect(update_ui_limits)
-    addon.rb_finish.toggled.connect(update_ui_limits)
-    addon.rb_finish_deck.toggled.connect(update_ui_limits)  # NEW
+    rb_cards.toggled.connect(update_ui_limits)
+    rb_correct.toggled.connect(update_ui_limits)
+    rb_time.toggled.connect(update_ui_limits)
+    rb_finish.toggled.connect(update_ui_limits)
+    rb_finish_deck.toggled.connect(update_ui_limits)
     update_ui_limits()
 
     if addon.mode == "time" and addon.initial_minutes > 0:
-        addon.spin_val.setValue(addon.initial_minutes)
+        spin_val.setValue(addon.initial_minutes)
     elif addon.target_val > 0:
-        addon.spin_val.setValue(addon.target_val)
+        spin_val.setValue(addon.target_val)
 
     if is_update:
-        addon.rb_cards.setEnabled(False)
-        addon.rb_correct.setEnabled(False)
-        addon.rb_time.setEnabled(False)
-        addon.rb_finish.setEnabled(False)
-        addon.spin_val.setEnabled(False)
+        rb_cards.setEnabled(False)
+        rb_correct.setEnabled(False)
+        rb_time.setEnabled(False)
+        rb_finish.setEnabled(False)
+        rb_finish_deck.setEnabled(False)
+        spin_val.setEnabled(False)
 
-    lay_goal.addWidget(addon.rb_cards)
-    lay_goal.addWidget(addon.rb_correct)
-    lay_goal.addWidget(addon.rb_time)
-    lay_goal.addWidget(addon.rb_finish)
-    lay_goal.addWidget(addon.rb_finish_deck)
+    lay_goal.addWidget(rb_cards)
+    lay_goal.addWidget(rb_correct)
+    lay_goal.addWidget(rb_time)
+    lay_goal.addWidget(rb_finish)
+    lay_goal.addWidget(rb_finish_deck)
     lay_goal.addLayout(h_spin)
     sec_goal.setLayout(lay_goal)
     layout.addWidget(sec_goal)
@@ -135,58 +137,57 @@ def open_settings(addon, is_update=False):
     lay_sec.setContentsMargins(15, 15, 15, 15)
     lay_sec.setSpacing(10)
 
-    addon.rb_lock_none = QRadioButton("Unlocked")
-    addon.rb_lock_blind = QRadioButton("Locked")
-    addon.rb_lock_random = QRadioButton("Random Text (200 characters)")
-    addon.rb_lock_custom = QRadioButton("Custom Password")
+    rb_lock_none = QRadioButton("Unlocked")
+    rb_lock_blind = QRadioButton("Locked")
+    rb_lock_random = QRadioButton("Random Text (200 characters)")
+    rb_lock_custom = QRadioButton("Custom Password")
 
     lock_type = getattr(addon, "lock_type", "none")
     if lock_type == "custom":
-        addon.rb_lock_custom.setChecked(True)
+        rb_lock_custom.setChecked(True)
     elif lock_type == "blind":
-        addon.rb_lock_blind.setChecked(True)
+        rb_lock_blind.setChecked(True)
     elif lock_type == "random":
-        addon.rb_lock_random.setChecked(True)
+        rb_lock_random.setChecked(True)
     else:
-        addon.rb_lock_none.setChecked(True)
+        rb_lock_none.setChecked(True)
 
-    addon.txt_pass = QLineEdit()
-    addon.txt_pass.setEchoMode(QLineEdit.EchoMode.Password)
-    addon.txt_pass.setFixedWidth(200)
-    addon.txt_pass.setFixedHeight(28)
+    txt_pass = QLineEdit()
+    txt_pass.setEchoMode(QLineEdit.EchoMode.Password)
+    txt_pass.setFixedWidth(200)
+    txt_pass.setFixedHeight(28)
 
     if hasattr(addon, "custom_password"):
-        addon.txt_pass.setText(addon.custom_password)
+        txt_pass.setText(addon.custom_password)
 
-        # Create a dedicated container widget for the password layout so it collapses entirely
-        pass_container = QWidget()
-        h_pass = QHBoxLayout(pass_container)
-        h_pass.setContentsMargins(25, 0, 0, 0)  # 25px left indent
-        h_pass.addWidget(addon.txt_pass)
-        h_pass.addStretch()
+    pass_container = QWidget()
+    h_pass = QHBoxLayout(pass_container)
+    h_pass.setContentsMargins(25, 0, 0, 0)
+    h_pass.addWidget(txt_pass)
+    h_pass.addStretch()
 
-        def toggle_pass_fields():
-            is_custom = addon.rb_lock_custom.isChecked()
-            pass_container.setVisible(is_custom)  # Hide the container, not just the text box
+    def toggle_pass_fields():
+        is_custom = rb_lock_custom.isChecked()
+        pass_container.setVisible(is_custom)
 
-        addon.rb_lock_none.toggled.connect(toggle_pass_fields)
-        addon.rb_lock_custom.toggled.connect(toggle_pass_fields)
-        addon.rb_lock_blind.toggled.connect(toggle_pass_fields)
-        addon.rb_lock_random.toggled.connect(toggle_pass_fields)
-        toggle_pass_fields()
+    rb_lock_none.toggled.connect(toggle_pass_fields)
+    rb_lock_custom.toggled.connect(toggle_pass_fields)
+    rb_lock_blind.toggled.connect(toggle_pass_fields)
+    rb_lock_random.toggled.connect(toggle_pass_fields)
+    toggle_pass_fields()
 
-        if is_update:
-            addon.rb_lock_none.setEnabled(False)
-            addon.rb_lock_custom.setEnabled(False)
-            addon.rb_lock_blind.setEnabled(False)
-            addon.rb_lock_random.setEnabled(False)
-            addon.txt_pass.setEnabled(False)
+    if is_update:
+        rb_lock_none.setEnabled(False)
+        rb_lock_custom.setEnabled(False)
+        rb_lock_blind.setEnabled(False)
+        rb_lock_random.setEnabled(False)
+        txt_pass.setEnabled(False)
 
-        lay_sec.addWidget(addon.rb_lock_none)
-        lay_sec.addWidget(addon.rb_lock_blind)
-        lay_sec.addWidget(addon.rb_lock_random)
-        lay_sec.addWidget(addon.rb_lock_custom)
-        lay_sec.addWidget(pass_container)  # Add the container to the main layout
+    lay_sec.addWidget(rb_lock_none)
+    lay_sec.addWidget(rb_lock_blind)
+    lay_sec.addWidget(rb_lock_random)
+    lay_sec.addWidget(rb_lock_custom)
+    lay_sec.addWidget(pass_container)
 
     sec_sec.setLayout(lay_sec)
     layout.addWidget(sec_sec)
@@ -207,10 +208,34 @@ def open_settings(addon, is_update=False):
         f"QPushButton:hover {{ background-color: {btn_hover}; }}"
     )
 
+    # FIX: Read the local variables, put them in a dictionary, and pass that to start_lock safely.
+    def on_activate():
+        settings = {
+            'val': spin_val.value(),
+            'mode': 'time' if rb_time.isChecked() else
+                    'correct' if rb_correct.isChecked() else
+                    'finish_reviews' if rb_finish.isChecked() else
+                    'finish_deck' if rb_finish_deck.isChecked() else 'cards',
+            'lock_type': 'custom' if rb_lock_custom.isChecked() else
+                         'blind' if rb_lock_blind.isChecked() else
+                         'random' if rb_lock_random.isChecked() else 'none',
+            'password': txt_pass.text().strip()
+        }
+
+        # Validate password immediately in UI before passing to enforcer
+        if settings['lock_type'] == 'custom' and not settings['password']:
+            from aqt.utils import tooltip
+            tooltip("Password cannot be empty!")
+            return
+
+        success = addon.start_lock(settings)
+        if success is not False:
+            d.accept()
+
     if is_update:
         btn_start.clicked.connect(d.accept)
     else:
-        btn_start.clicked.connect(lambda: addon.start_lock(d))
+        btn_start.clicked.connect(on_activate)
 
     btn_layout = QHBoxLayout()
     btn_layout.addStretch()
@@ -219,7 +244,6 @@ def open_settings(addon, is_update=False):
 
     layout.addSpacing(10)
     layout.addLayout(btn_layout)
-
     layout.addStretch()
 
     d.setLayout(layout)
