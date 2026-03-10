@@ -410,7 +410,7 @@ class AnkiLock:
             if mw.col.decks.get_current_id() != self.locked_deck_id:
                 mw.moveToState("deckBrowser")
                 tooltip(
-                    f"Micromanager: You are locked to your selected deck until your goal is met! (Deck ID: {self.locked_deck_id})",
+                    f"Micromanager: You are locked to your selected deck until your goal is met! (Deck {mw.col.decks.name(self.locked_deck_id)})",
                     period=3000)
 
         # Check if the daily reviews have been completely cleared
@@ -532,7 +532,7 @@ class AnkiLock:
 
                 var d = document.createElement('div');
                 d.innerHTML = '{safe_html}';
-                document.body.appendChild(d);
+                document.body.appendChild(d.firstElementChild);
                 
                 // Re-fetch the newly created HUD
                 hud = document.getElementById('force-hud-container');
