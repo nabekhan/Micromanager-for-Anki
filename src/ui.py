@@ -59,8 +59,8 @@ def open_settings(addon, is_update=False):
     rb_time = QRadioButton("Time")
     rb_correct = QRadioButton("Correct Answers")
     rb_new = QRadioButton("New Cards")
-    rb_cards = QRadioButton("Reviews")
-    rb_finish = QRadioButton("Reviews Due")
+    rb_review = QRadioButton("Reviews")
+    rb_finish_review = QRadioButton("Reviews Due")
     rb_finish_deck = QRadioButton("Complete Deck")
 
     if addon.mode == "time":
@@ -70,11 +70,11 @@ def open_settings(addon, is_update=False):
     elif addon.mode == "new_cards":
         rb_new.setChecked(True)
     elif addon.mode == "finish_reviews":
-        rb_finish.setChecked(True)
+        rb_finish_review.setChecked(True)
     elif addon.mode == "finish_deck":
         rb_finish_deck.setChecked(True)
     else:
-        rb_cards.setChecked(True)
+        rb_review.setChecked(True)
 
     spin_val = QSpinBox()
     spin_val.setMinimumWidth(80)
@@ -88,7 +88,7 @@ def open_settings(addon, is_update=False):
     h_spin.addStretch()
 
     def update_ui_limits():
-        is_finish = rb_finish.isChecked() or rb_finish_deck.isChecked()
+        is_finish = rb_finish_review.isChecked() or rb_finish_deck.isChecked()
         spin_val.setVisible(not is_finish)
         lbl_suffix.setVisible(not is_finish)
 
@@ -102,11 +102,11 @@ def open_settings(addon, is_update=False):
             spin_val.setRange(1, 5000)
             lbl_suffix.setText("cards")
 
-    rb_cards.toggled.connect(update_ui_limits)
+    rb_time.toggled.connect(update_ui_limits)
     rb_correct.toggled.connect(update_ui_limits)
     rb_new.toggled.connect(update_ui_limits)
-    rb_time.toggled.connect(update_ui_limits)
-    rb_finish.toggled.connect(update_ui_limits)
+    rb_review.toggled.connect(update_ui_limits)
+    rb_finish_review.toggled.connect(update_ui_limits)
     rb_finish_deck.toggled.connect(update_ui_limits)
     update_ui_limits()
 
@@ -116,19 +116,19 @@ def open_settings(addon, is_update=False):
         spin_val.setValue(addon.target_val)
 
     if is_update:
-        rb_cards.setEnabled(False)
+        rb_review.setEnabled(False)
         rb_correct.setEnabled(False)
         rb_new.setEnabled(False)
         rb_time.setEnabled(False)
-        rb_finish.setEnabled(False)
+        rb_finish_review.setEnabled(False)
         rb_finish_deck.setEnabled(False)
         spin_val.setEnabled(False)
 
-    lay_goal.addWidget(rb_cards)
+    lay_goal.addWidget(rb_time)
     lay_goal.addWidget(rb_correct)
     lay_goal.addWidget(rb_new)
-    lay_goal.addWidget(rb_time)
-    lay_goal.addWidget(rb_finish)
+    lay_goal.addWidget(rb_review)
+    lay_goal.addWidget(rb_finish_review)
     lay_goal.addWidget(rb_finish_deck)
     lay_goal.addLayout(h_spin)
     sec_goal.setLayout(lay_goal)
@@ -220,7 +220,7 @@ def open_settings(addon, is_update=False):
             'mode': 'time' if rb_time.isChecked() else
                     'correct' if rb_correct.isChecked() else
                     'new_cards' if rb_new.isChecked() else
-                    'finish_reviews' if rb_finish.isChecked() else
+                    'finish_reviews' if rb_finish_review.isChecked() else
                     'finish_deck' if rb_finish_deck.isChecked() else 'cards',
             'lock_type': 'custom' if rb_lock_custom.isChecked() else
                          'blind' if rb_lock_blind.isChecked() else
