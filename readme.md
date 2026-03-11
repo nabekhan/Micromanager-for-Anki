@@ -34,12 +34,14 @@ You can choose how difficult it is to "break" a session early:
 
 ### **Goal Types**
 
-Sessions can be configured based on four distinct targets:
+Sessions can be configured based on six distinct targets:
 
 * **Total Reviews**: Complete a specific number of card reviews.
 * **Correct Answers**: Stay locked in until you have answered a specific number of cards correctly.
-* **Time (Minutes)**: A countdown timer that unlocks once the allotted time has expired.
+* **New Cards**: Complete a specific number of new cards.
+* **Time**: A countdown timer that unlocks once the allotted time has expired.
 * **Reviews Due**: Locks you in until all currently due reviews in the selected deck are cleared.
+* **Complete Deck**: Locks you in until all available new and review cards in the selected deck are cleared.
 
 ---
 
@@ -51,7 +53,7 @@ Sessions can be configured based on four distinct targets:
 
 ### **User Interface**
 
-While a session is active, a persistent Heads-Up Display (HUD) appears at the top of the reviewer:
+While a session is active, a persistent Heads-Up Display (HUD) appears at the bottom of the reviewer:
 
 * **Progress Bar**: Visually tracks how close you are to your goal.
 * **Status Label**: Shows your current count (e.g., "15 CARDS LEFT" or "05:00 TIMER").
