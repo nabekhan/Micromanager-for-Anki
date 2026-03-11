@@ -13,8 +13,8 @@ from . import ui
 class AnkiLock:
     def __init__(self):
         self.active = False
-
-        # FIX: Load history immediately so settings persist between unlocked sessions
+        self._history = []
+        # FIX: Load immediately so settings persist between unlocked sessions
         conf = load_config()
         self.mode = conf.get("saved_mode", "cards")
         self.target_val = conf.get("saved_target", 0)
@@ -139,7 +139,7 @@ class AnkiLock:
 
     def request_settings(self):
         if not self.active and mw.state not in ["overview", "review"]:
-            tooltip("Please select a deck before activating Micromanager")
+            tooltip("Micromanager: Please select a deck before activating Micromanager")
             return
         ui.open_settings(self, is_update=self.active)
 
@@ -179,11 +179,11 @@ class AnkiLock:
             # sum(counts) totals up New, Learning, and Review cards
             total_due = sum(counts) if counts else 0
         except AttributeError:
-            tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
+            tooltip("Micromanager Error: Could not read Anki's scheduler. Goal aborted.")
             return False
 
         if total_due == 0:
-            tooltip("No cards are currently due in this deck! Lock aborted.")
+            tooltip("Micromanager: No cards are currently due in this deck! Lock aborted.")
             return False
         # -----------------------------------------------------------
 
@@ -201,7 +201,7 @@ class AnkiLock:
         elif self.mode == "new_cards":
             available_new = counts[0] if counts and len(counts) >= 1 else 0
             if available_new == 0:
-                tooltip("No new cards are currently available in this deck! Lock aborted.")
+                tooltip("Micromanager: No new cards are currently available in this deck! Lock aborted.")
                 return False
             self.target_val = min(val, available_new)
             self.current_val = 0
@@ -210,7 +210,7 @@ class AnkiLock:
         elif self.mode == "finish_reviews":
             self.target_val = counts[2] if counts and len(counts) >= 3 else 0
             if self.target_val == 0:
-                tooltip("No reviews are currently due in this deck! Lock aborted.")
+                tooltip("Micromanager: No reviews are currently due in this deck! Lock aborted.")
                 return False
             self.current_val = 0
             self.initial_minutes = 5
@@ -218,7 +218,7 @@ class AnkiLock:
         elif self.mode == "finish_deck":
             self.target_val = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
             if self.target_val == 0:
-                tooltip("No cards are currently due in this deck! Lock aborted.")
+                tooltip("Micromanager: No cards are currently due in this deck! Lock aborted.")
                 return False
             self.current_val = 0
             self.initial_minutes = 5
@@ -249,13 +249,14 @@ class AnkiLock:
             mw.moveToState("review")
         else:
             mw.reset()
-
+        self._history = []
         QTimer.singleShot(300, self.update_webview)
         return True
 
     def stop_lock(self, success=False):
         self.active = False
         self.locked_deck_id = None
+        self._history = []
         self.timer.stop()
         self.save_timer.stop()
         self.clear_persistence()
@@ -520,39 +521,52 @@ class AnkiLock:
     def on_answer(self, reviewer, card, ease):
         if not self.active: return
 
+        # Determine if this specific answer should give them a point
+        counted = False
+
         if self.mode == "cards":
+            counted = True
+        elif self.mode == "correct" and ease > 1:
+            counted = True
+        elif self.mode == "new_cards" and getattr(self, "_current_card_is_new", False):
+            counted = True
+
+        # Save this action to our history stack
+        if not hasattr(self, "_history"):
+            self._history = []
+        self._history.append(counted)
+
+        # Apply the point and check for victory
+        if counted:
             self.current_val += 1
             self.update_persistence()
             if self.current_val >= self.target_val:
                 self.stop_lock(success=True)
                 return
-        elif self.mode == "correct":
-            if ease > 1:
-                self.current_val += 1
-                self.update_persistence()
-                if self.current_val >= self.target_val:
-                    self.stop_lock(success=True)
-                    return
-        elif self.mode == "new_cards":
-            if getattr(self, "_current_card_is_new", False):
-                self.current_val += 1
-                self.update_persistence()
-                if self.current_val >= self.target_val:
-                    self.stop_lock(success=True)
-                    return
 
         self.update_webview()
 
     def on_undo(self, *args):
-        return
-        """
         if not self.active: return
-        if self.mode == "cards" and self.current_val > 0:
-            self.current_val -= 1
 
-        self.update_webview()
-        self.update_persistence()
-        """
+        # For modes that rely purely on reading Anki's scheduler counts,
+        # we don't need math; we just tell the HUD to refresh its data.
+        if self.mode in ["finish_reviews", "finish_deck"]:
+            self.update_webview()
+            return
+
+        # For counter-based modes, we look at the history stack
+        if self.mode in ["cards", "correct", "new_cards"]:
+            if hasattr(self, "_history") and len(self._history) > 0:
+                # Pop the most recent answer off the stack
+                last_action_counted = self._history.pop()
+
+                # If that answer gave them a point, take it away
+                if last_action_counted and self.current_val > 0:
+                    self.current_val -= 1
+                    self.update_persistence()
+
+            self.update_webview()
 
     def update_webview(self, *args, **kwargs):
         if not self.active: return

@@ -56,11 +56,10 @@ def open_settings(addon, is_update=False):
     lay_goal.setContentsMargins(15, 15, 15, 15)
     lay_goal.setSpacing(10)
 
-    # FIX: Create as local variables, do not attach to `addon`
-    rb_cards = QRadioButton("Total Reviews")
+    rb_time = QRadioButton("Time")
     rb_correct = QRadioButton("Correct Answers")
     rb_new = QRadioButton("New Cards")
-    rb_time = QRadioButton("Time")
+    rb_cards = QRadioButton("Reviews")
     rb_finish = QRadioButton("Reviews Due")
     rb_finish_deck = QRadioButton("Complete Deck")
 
@@ -232,7 +231,7 @@ def open_settings(addon, is_update=False):
         # Validate password immediately in UI before passing to enforcer
         if settings['lock_type'] == 'custom' and not settings['password']:
             from aqt.utils import tooltip
-            tooltip("Password cannot be empty!")
+            tooltip("Micromanager: Password cannot be empty!")
             return
 
         success = addon.start_lock(settings)
