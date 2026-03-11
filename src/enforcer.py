@@ -182,7 +182,18 @@ class AnkiLock:
             self.current_val = 0
             self.initial_minutes = 5
         elif self.mode == "new_cards":
-            self.target_val = val
+            try:
+                counts = mw.col.sched.counts()
+                # counts[0] represents the New cards in Anki's scheduler
+                available_new = counts[0] if counts and len(counts) >= 1 else 0
+            except AttributeError:
+                tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
+                return False
+
+            if available_new == 0:
+                tooltip("No new cards are currently available in this deck! Lock aborted.")
+                return False
+            self.target_val = min(val, available_new)
             self.current_val = 0
             self.initial_minutes = 5
         elif self.mode == "finish_reviews":
