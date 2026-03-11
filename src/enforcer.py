@@ -173,67 +173,65 @@ class AnkiLock:
         self.mode = settings.get('mode', 'cards')
         val = settings.get('val', 5)
 
+        # --- GLOBAL SAFETY CHECK: PREVENT LOCKING ON EMPTY DECKS ---
+        try:
+            counts = mw.col.sched.counts()
+            # sum(counts) totals up New, Learning, and Review cards
+            total_due = sum(counts) if counts else 0
+        except AttributeError:
+            tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
+            return False
+
+        if total_due == 0:
+            tooltip("No cards are currently due in this deck! Lock aborted.")
+            return False
+        # -----------------------------------------------------------
+
         if self.mode == "time":
             self.initial_minutes = val
             self.target_val = val * 60
             self.current_val = self.target_val
+
         elif self.mode == "correct":
-            self.target_val = val
+            # Cap the goal to the total available cards so they don't get soft-locked
+            self.target_val = min(val, total_due)
             self.current_val = 0
             self.initial_minutes = 5
-        elif self.mode == "new_cards":
-            try:
-                counts = mw.col.sched.counts()
-                # counts[0] represents the New cards in Anki's scheduler
-                available_new = counts[0] if counts and len(counts) >= 1 else 0
-            except AttributeError:
-                tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
-                return False
 
+        elif self.mode == "new_cards":
+            available_new = counts[0] if counts and len(counts) >= 1 else 0
             if available_new == 0:
                 tooltip("No new cards are currently available in this deck! Lock aborted.")
                 return False
             self.target_val = min(val, available_new)
             self.current_val = 0
             self.initial_minutes = 5
-        elif self.mode == "finish_reviews":
-            try:
-                counts = mw.col.sched.counts()
-                self.target_val = counts[2] if counts and len(counts) >= 3 else 0
-            except AttributeError:
-                self.target_val = 0
-                tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
-                return False
 
+        elif self.mode == "finish_reviews":
+            self.target_val = counts[2] if counts and len(counts) >= 3 else 0
             if self.target_val == 0:
                 tooltip("No reviews are currently due in this deck! Lock aborted.")
                 return False
-
             self.current_val = 0
             self.initial_minutes = 5
-        elif self.mode == "finish_deck":
-            try:
-                counts = mw.col.sched.counts()
-                # FIX: Set the initial goal using only New + Review
-                self.target_val = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
-            except AttributeError:
-                self.target_val = 0
-                tooltip("Error: Could not read Anki's scheduler. Goal aborted.")
-                return False
 
+        elif self.mode == "finish_deck":
+            self.target_val = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
             if self.target_val == 0:
                 tooltip("No cards are currently due in this deck! Lock aborted.")
                 return False
-
             self.current_val = 0
             self.initial_minutes = 5
+
         else:
             self.mode = "cards"
-            self.target_val = val
+            # Cap the goal to the total available cards
+            self.target_val = min(val, total_due)
             self.current_val = 0
             self.initial_minutes = 5
 
         self.active = True
+
         mw.form.actionAdd_ons.setEnabled(False)
         mw.form.actionSwitchProfile.setEnabled(False)
         self.save_timer.start(10000)
@@ -436,23 +434,37 @@ class AnkiLock:
                     f"Micromanager: You are locked to your selected deck until your goal is met! (Deck {mw.col.decks.name(self.locked_deck_id)})",
                     period=3000)
 
-        # Check if the daily reviews have been completely cleared
-        if self.mode == "finish_reviews" and mw.state == "review":
-            counts = mw.col.sched.counts()
-            remaining_reviews = counts[2] if counts and len(counts) >= 3 else 0
-            if remaining_reviews == 0:
-                self.stop_lock(success=True)
-                return
-
-            # Check if the entire deck is cleared (Inside both on_tick AND on_question_shown)
-        elif self.mode == "finish_deck":
+        # === DECK COMPLETION CHECKS ===
+        if mw.state in ["overview", "review"]:
             try:
                 counts = mw.col.sched.counts()
-                # FIX: Only check if New and Review are zero
-                remaining_total = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
-                if remaining_total <= 0:
+
+                # 1. Global Failsafe: If the deck is completely empty (no New, Learning, or Review), unlock.
+                total_due = sum(counts) if counts else 0
+                if total_due == 0:
                     self.stop_lock(success=True)
                     return
+
+                # 2. Specific Mode Checks (if the deck isn't totally empty, but their specific goal is met)
+                if self.mode == "finish_reviews":
+                    remaining_reviews = counts[2] if len(counts) >= 3 else 0
+                    if remaining_reviews == 0:
+                        self.stop_lock(success=True)
+                        return
+
+                elif self.mode == "finish_deck":
+                    # Only check if New and Review are zero
+                    remaining_total = (counts[0] + counts[2]) if len(counts) >= 3 else 0
+                    if remaining_total <= 0:
+                        self.stop_lock(success=True)
+                        return
+
+                elif self.mode == "new_cards":
+                    remaining_new = counts[0] if len(counts) >= 1 else 0
+                    if remaining_new == 0:
+                        self.stop_lock(success=True)
+                        return
+
             except AttributeError:
                 pass
 
