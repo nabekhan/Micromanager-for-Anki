@@ -25,7 +25,6 @@ class EventBlocker(QObject):
 
 
 def open_settings(addon, is_update=False):
-    """Builds and displays the main, streamlined configuration window."""
     d = QDialog(mw)
     d.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
     d.setWindowTitle("Micromanager")
@@ -33,23 +32,63 @@ def open_settings(addon, is_update=False):
 
     is_night = theme_manager.night_mode
     if is_night:
-        dlg_bg, dlg_fg, box_bg, input_bg = "#2b2b2b", "white", "#3a3a3a", "#4a4a4a"
+        dlg_bg, dlg_fg = "#1e1e1e", "#ffffff"
+        box_bg, input_bg = "#2a2a2a", "#1a1a1a"
+        border_col, accent = "#444444", "#0a84ff"
+        btn_bg, btn_hover, btn_fg = "#3a3a3a", "#4a4a4a", "#ffffff"
     else:
-        dlg_bg, dlg_fg, box_bg, input_bg = "#ececec", "black", "#ffffff", "#ffffff"
+        dlg_bg, dlg_fg = "#f5f5f5", "#000000"
+        box_bg, input_bg = "#ffffff", "#ffffff"
+        border_col, accent = "#dddddd", "#007aff"
+        btn_bg, btn_hover, btn_fg = "#e0e0e0", "#d0d0d0", "#000000"
 
     d.setStyleSheet(f"""
-        QDialog {{ background-color: {dlg_bg}; color: {dlg_fg}; }}
-        #sectionBox {{ background-color: {box_bg}; border-radius: 8px; }}
-        QLabel, QRadioButton, QCheckBox {{ color: {dlg_fg}; font-size: 13px; }}
-        QLineEdit, QTextEdit {{ padding: 5px; font-size: 13px; color: {dlg_fg}; background-color: {input_bg}; border: 1px solid #ccc; border-radius: 4px; }}
-        .desc-label {{ color: #888; font-size: 11px; font-style: italic; }}
+        QDialog {{ background-color: {dlg_bg}; color: {dlg_fg}; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+        #sectionBox {{ background-color: {box_bg}; border-radius: 12px; border: 1px solid {border_col}; }}
+        QLabel, QRadioButton, QCheckBox {{ color: {dlg_fg}; font-size: 14px; padding: 2px; }}
+
+        /* Modern Inputs */
+        QLineEdit, QTextEdit, QSpinBox {{ 
+            padding: 8px 12px; 
+            font-size: 14px; 
+            color: {dlg_fg}; 
+            background-color: {input_bg}; 
+            border: 1px solid {border_col}; 
+            border-radius: 8px; 
+        }}
+        QLineEdit:focus, QTextEdit:focus, QSpinBox:focus {{ 
+            border: 1px solid {accent}; 
+            background-color: {box_bg};
+        }}
+
+        /* Fix SpinBox Arrows */
+        QSpinBox::up-button, QSpinBox::down-button {{
+            background-color: {box_bg};
+            border-left: 1px solid {border_col};
+            width: 24px;
+        }}
+        QSpinBox::up-button {{
+            border-bottom: 1px solid {border_col};
+            border-top-right-radius: 7px;
+        }}
+        QSpinBox::down-button {{
+            border-bottom-right-radius: 7px;
+        }}
+        QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
+            background-color: {accent};
+        }}
+
+        /* Smooth Radio Buttons */
+        QRadioButton::indicator {{ width: 16px; height: 16px; border-radius: 8px; border: 2px solid {border_col}; background-color: {input_bg}; }}
+        QRadioButton::indicator:checked {{ background-color: {accent}; border: 2px solid {accent}; }}
+
+        .desc-label {{ color: #888888; font-size: 12px; font-style: italic; }}
     """)
 
     layout = QVBoxLayout()
     layout.setSpacing(15)
     layout.setContentsMargins(20, 20, 20, 20)
 
-    # --- Section 1: Goal Type ---
     sec_goal = QWidget()
     sec_goal.setObjectName("sectionBox")
     lay_goal = QVBoxLayout()
@@ -95,9 +134,6 @@ def open_settings(addon, is_update=False):
         if rb_time.isChecked():
             spin_val.setRange(1, 480)
             lbl_suffix.setText("minutes")
-        elif rb_correct.isChecked() or rb_new.isChecked():
-            spin_val.setRange(1, 5000)
-            lbl_suffix.setText("cards")
         else:
             spin_val.setRange(1, 5000)
             lbl_suffix.setText("cards")
@@ -134,10 +170,8 @@ def open_settings(addon, is_update=False):
     sec_goal.setLayout(lay_goal)
     layout.addWidget(sec_goal)
 
-    # --- Section 2: Security Settings ---
     sec_sec = QWidget()
     sec_sec.setObjectName("sectionBox")
-
     lay_sec = QVBoxLayout()
     lay_sec.setContentsMargins(15, 15, 15, 15)
     lay_sec.setSpacing(10)
@@ -172,8 +206,7 @@ def open_settings(addon, is_update=False):
     h_pass.addStretch()
 
     def toggle_pass_fields():
-        is_custom = rb_lock_custom.isChecked()
-        pass_container.setVisible(is_custom)
+        pass_container.setVisible(rb_lock_custom.isChecked())
 
     rb_lock_none.toggled.connect(toggle_pass_fields)
     rb_lock_custom.toggled.connect(toggle_pass_fields)
@@ -193,49 +226,47 @@ def open_settings(addon, is_update=False):
     lay_sec.addWidget(rb_lock_random)
     lay_sec.addWidget(rb_lock_custom)
     lay_sec.addWidget(pass_container)
-
     sec_sec.setLayout(lay_sec)
     layout.addWidget(sec_sec)
 
-    # --- Action Button ---
     btn_text = "Close" if is_update else "Activate Lock"
-    btn_color = "#3498db" if is_update else "#27ae60"
-    btn_hover = "#2980b9" if is_update else "#2ecc71"
-
     btn_start = QPushButton(btn_text)
     btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
     btn_start.setMinimumWidth(200)
     btn_start.setDefault(True)
     btn_start.setAutoDefault(True)
+    btn_start.setStyleSheet(f"""
+        QPushButton {{ 
+            background-color: {btn_bg}; 
+            color: {btn_fg}; 
+            padding: 12px; 
+            font-size: 14px; 
+            font-weight: bold; 
+            border-radius: 10px; 
+            border: none;
+        }}
+        QPushButton:hover {{ background-color: {btn_hover}; }}
+        QPushButton:pressed {{ margin-top: 2px; margin-bottom: -2px; }}
+    """)
 
-    btn_start.setStyleSheet(
-        f"QPushButton {{ background-color: {btn_color}; color: white; padding: 10px 10px; font-size: 14px; font-weight: bold; border-radius: 6px; border: none;}} "
-        f"QPushButton:hover {{ background-color: {btn_hover}; }}"
-    )
-
-    # FIX: Read the local variables, put them in a dictionary, and pass that to start_lock safely.
     def on_activate():
         settings = {
             'val': spin_val.value(),
             'mode': 'time' if rb_time.isChecked() else
-                    'correct' if rb_correct.isChecked() else
-                    'new_cards' if rb_new.isChecked() else
-                    'finish_reviews' if rb_finish_review.isChecked() else
-                    'finish_deck' if rb_finish_deck.isChecked() else 'cards',
+            'correct' if rb_correct.isChecked() else
+            'new_cards' if rb_new.isChecked() else
+            'finish_reviews' if rb_finish_review.isChecked() else
+            'finish_deck' if rb_finish_deck.isChecked() else 'cards',
             'lock_type': 'custom' if rb_lock_custom.isChecked() else
-                         'blind' if rb_lock_blind.isChecked() else
-                         'random' if rb_lock_random.isChecked() else 'none',
+            'blind' if rb_lock_blind.isChecked() else
+            'random' if rb_lock_random.isChecked() else 'none',
             'password': txt_pass.text().strip()
         }
-
-        # Validate password immediately in UI before passing to enforcer
         if settings['lock_type'] == 'custom' and not settings['password']:
             from aqt.utils import tooltip
             tooltip("Micromanager: Password cannot be empty!")
             return
-
-        success = addon.start_lock(settings)
-        if success is not False:
+        if addon.start_lock(settings) is not False:
             d.accept()
 
     if is_update:
@@ -251,31 +282,35 @@ def open_settings(addon, is_update=False):
     layout.addSpacing(10)
     layout.addLayout(btn_layout)
     layout.addStretch()
-
     d.setLayout(layout)
     d.exec()
 
 
 def open_unlock_dialog(lock_type, expected_password):
-    """Smart unlock dialog that adapts based on the lock type."""
     d = QDialog(mw)
     d.setWindowTitle("Unlock")
     d.setMinimumWidth(400)
 
     is_night = theme_manager.night_mode
     if is_night:
-        dlg_bg, dlg_fg, input_bg = "#2b2b2b", "white", "#4a4a4a"
+        dlg_bg, dlg_fg, input_bg = "#1e1e1e", "#ffffff", "#1a1a1a"
+        border_col, accent = "#444444", "#0a84ff"
+        btn_bg, btn_hover, btn_fg = "#3a3a3a", "#4a4a4a", "#ffffff"
+        err_fg = "#ff453a"
     else:
-        dlg_bg, dlg_fg, input_bg = "#ececec", "black", "#ffffff"
+        dlg_bg, dlg_fg, input_bg = "#f5f5f5", "#000000", "#ffffff"
+        border_col, accent = "#dddddd", "#007aff"
+        btn_bg, btn_hover, btn_fg = "#e0e0e0", "#d0d0d0", "#000000"
+        err_fg = "#ff3b30"
 
     d.setStyleSheet(f"""
-        QDialog {{ background-color: {dlg_bg}; color: {dlg_fg}; }}
-        QLabel {{ color: {dlg_fg}; font-size: 14px; font-weight: bold; }}
-        QPushButton {{ border-radius: 6px; border: none; font-weight: bold; padding: 8px 16px; font-size: 13px; color: white; }}
-        #btnCancel {{ background-color: #7f8c8d; }}
-        #btnCancel:hover {{ background-color: #95a5a6; }}
-        #btnUnlock {{ background-color: #e74c3c; }}
-        #btnUnlock:hover {{ background-color: #c0392b; }}
+        QDialog {{ background-color: {dlg_bg}; color: {dlg_fg}; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+        QLabel {{ color: {dlg_fg}; font-size: 14px; font-weight: 600; }}
+        QTextEdit, QLineEdit {{ background-color: {input_bg}; color: {dlg_fg}; padding: 10px; border: 1px solid {border_col}; border-radius: 8px; font-size: 14px; }}
+        QTextEdit:focus, QLineEdit:focus {{ border: 1px solid {accent}; }}
+        QPushButton {{ background-color: {btn_bg}; color: {btn_fg}; border-radius: 10px; border: none; font-weight: bold; padding: 10px 20px; font-size: 14px; }}
+        QPushButton:hover {{ background-color: {btn_hover}; }}
+        QPushButton:pressed {{ margin-top: 2px; margin-bottom: -2px; }}
     """)
 
     layout = QVBoxLayout()
@@ -284,7 +319,7 @@ def open_unlock_dialog(lock_type, expected_password):
     layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
     lbl_error = QLabel("")
-    lbl_error.setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 13px;")
+    lbl_error.setStyleSheet(f"color: {err_fg}; font-weight: bold; font-size: 13px;")
     lbl_error.hide()
 
     btn_layout = QHBoxLayout()
@@ -302,28 +337,19 @@ def open_unlock_dialog(lock_type, expected_password):
         layout.addWidget(lbl)
         layout.addLayout(btn_layout)
         d.setLayout(layout)
-
     elif lock_type == "random":
         lbl = QLabel("Type the following exact text to unlock:")
         layout.addWidget(lbl)
-
         txt_target = QTextEdit(expected_password)
         txt_target.setReadOnly(True)
         txt_target.setFixedHeight(80)
-        txt_target.setStyleSheet(
-            f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
         txt_target.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         layout.addWidget(txt_target)
-
         txt_input = QTextEdit()
         txt_input.setFixedHeight(80)
-        txt_input.setStyleSheet(
-            f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace;")
         txt_input.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         layout.addWidget(txt_input)
-
         layout.addWidget(lbl_error)
-
         btn_unlock = QPushButton("Unlock")
         btn_unlock.setObjectName("btnUnlock")
         btn_unlock.setAutoDefault(False)
@@ -337,25 +363,17 @@ def open_unlock_dialog(lock_type, expected_password):
                 lbl_error.show()
 
         btn_unlock.clicked.connect(attempt_unlock)
-
         d.filter = EventBlocker(block_enter=True, block_paste=True, enter_callback=attempt_unlock, parent=d)
         txt_input.installEventFilter(d.filter)
-
         txt_input.setFocus()
-
     elif lock_type == "custom":
         lbl = QLabel("Enter password to quit:")
         layout.addWidget(lbl)
-
         txt_input = QLineEdit()
         txt_input.setEchoMode(QLineEdit.EchoMode.Password)
         txt_input.setMaximumWidth(400)
-        txt_input.setStyleSheet(
-            f"background-color: {input_bg}; color: {dlg_fg}; padding: 8px; border: 1px solid #ccc; border-radius: 4px;")
         layout.addWidget(txt_input)
-
         layout.addWidget(lbl_error)
-
         btn_unlock = QPushButton("Unlock")
         btn_unlock.setObjectName("btnUnlock")
         btn_unlock.setAutoDefault(False)
@@ -369,41 +387,36 @@ def open_unlock_dialog(lock_type, expected_password):
                 lbl_error.show()
 
         btn_unlock.clicked.connect(attempt_unlock)
-
         d.filter = EventBlocker(block_enter=True, block_paste=False, enter_callback=attempt_unlock, parent=d)
         txt_input.installEventFilter(d.filter)
-
         txt_input.setFocus()
 
     layout.addStretch()
     layout.addLayout(btn_layout)
     d.setLayout(layout)
-
     return d.exec() == QDialog.DialogCode.Accepted
 
 
 def open_confirm_quit_dialog():
-    """A custom confirmation dialog to bypass macOS native message box quirks."""
     d = QDialog(mw)
     d.setWindowTitle("Unlock")
     d.setMinimumWidth(350)
-
     d.setWindowFlags(d.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
 
     is_night = theme_manager.night_mode
     if is_night:
-        dlg_bg, dlg_fg = "#2b2b2b", "white"
+        dlg_bg, dlg_fg = "#1e1e1e", "#ffffff"
+        btn_bg, btn_hover, btn_fg = "#3a3a3a", "#4a4a4a", "#ffffff"
     else:
-        dlg_bg, dlg_fg = "#ececec", "black"
+        dlg_bg, dlg_fg = "#f5f5f5", "#000000"
+        btn_bg, btn_hover, btn_fg = "#e0e0e0", "#d0d0d0", "#000000"
 
     d.setStyleSheet(f"""
-        QDialog {{ background-color: {dlg_bg}; color: {dlg_fg}; }}
-        QLabel {{ color: {dlg_fg}; font-size: 14px; font-weight: bold; }}
-        QPushButton {{ border-radius: 6px; border: none; font-weight: bold; padding: 8px 16px; font-size: 13px; color: white; min-width: 60px; }}
-        #btnNo {{ background-color: #3498db; }}
-        #btnNo:hover {{ background-color: #2980b9; }}
-        #btnYes {{ background-color: #e74c3c; }}
-        #btnYes:hover {{ background-color: #c0392b; }}
+        QDialog {{ background-color: {dlg_bg}; color: {dlg_fg}; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+        QLabel {{ color: {dlg_fg}; font-size: 15px; font-weight: 600; padding: 10px; }}
+        QPushButton {{ background-color: {btn_bg}; color: {btn_fg}; border-radius: 10px; border: none; font-weight: bold; padding: 10px 20px; font-size: 14px; min-width: 80px; }}
+        QPushButton:hover {{ background-color: {btn_hover}; }}
+        QPushButton:pressed {{ margin-top: 2px; margin-bottom: -2px; }}
     """)
 
     layout = QVBoxLayout()
@@ -417,21 +430,17 @@ def open_confirm_quit_dialog():
 
     btn_layout = QHBoxLayout()
     btn_layout.addStretch()
-
     btn_no = QPushButton("No")
     btn_no.setObjectName("btnNo")
     btn_no.setDefault(True)
     btn_no.clicked.connect(d.reject)
-
     btn_yes = QPushButton("Yes")
     btn_yes.setObjectName("btnYes")
     btn_yes.clicked.connect(d.accept)
-
     btn_layout.addWidget(btn_yes)
     btn_layout.addWidget(btn_no)
     btn_layout.addStretch()
 
     layout.addLayout(btn_layout)
     d.setLayout(layout)
-
     return d.exec() == QDialog.DialogCode.Accepted
