@@ -296,14 +296,16 @@ class AnkiLock:
         label_display = "LOCKED"
         pct = 0.0
 
-        # 1. TIME MODE (Bar shrinks from 100% -> 0%)
+        # 1. TIME MODE (Bar grows from 0% -> 100%)
         if self.mode == "time":
             mins = int(self.current_val / 60)
             secs = self.current_val % 60
             text_display = f"{mins:02d}:{secs:02d}"
             label_display = "TIMER"
             if self.target_val > 0:
-                pct = (self.current_val / self.target_val) * 100
+                # Calculate elapsed time to make the bar fill up
+                elapsed = self.target_val - self.current_val
+                pct = (elapsed / self.target_val) * 100
 
         # 2. CORRECT ANSWERS (Bar grows from 0% -> 100%)
         elif self.mode == "correct":

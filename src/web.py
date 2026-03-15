@@ -43,6 +43,8 @@ def get_hud_css_rules():
         opacity: 0.25 !important;
         z-index: 1 !important;
         transition: width 0.3s ease !important;
+        border-top-right-radius: 4px !important;    /* Softens the leading edge */
+        border-bottom-right-radius: 4px !important; /* Softens the leading edge */
     }
     #force-hud-content {
         position: relative !important;
@@ -56,7 +58,15 @@ def get_hud_css_rules():
         box-sizing: border-box !important;
     }
     .hud-section { display: flex !important; flex-direction: row !important; align-items: baseline !important; gap: 8px !important; border: none !important; }
-    .hud-val { font-size: 18px !important; font-weight: 800 !important; color: var(--text-fg) !important; line-height: 1 !important; margin: 0 !important; padding: 0 !important; }
+    .hud-val { 
+        font-size: 18px !important; 
+        font-weight: 800 !important; 
+        color: var(--text-fg) !important; 
+        line-height: 1 !important; 
+        margin: 0 !important; 
+        padding: 0 !important; 
+        font-variant-numeric: tabular-nums !important; /* Prevents timer text from wiggling */
+    }
     .hud-label { font-size: 11px !important; text-transform: uppercase !important; letter-spacing: 1px !important; color: var(--hud-label) !important; font-weight: 700 !important; border: none !important; }
 
     .hud-btn { 
@@ -93,8 +103,8 @@ HUD_HTML_TEMPLATE = """
             <div class="hud-label" id="lbl-display">{LBL}</div>
         </div>
         <div style="display:flex; gap:12px; align-items:center;">
-            <div id="hud-conf" class="hud-btn" title="Settings" onclick="pycmd('force_config')">≡</div>
-            <div id="hud-stop" class="hud-btn" title="Stop" onclick="pycmd('force_unlock')">X</div>
+            <div id="hud-conf" class="hud-btn" title="Settings" onclick="pycmd('force_config')">&#9881;</div>
+            <div id="hud-stop" class="hud-btn" title="Stop" onclick="pycmd('force_unlock')">&times;</div>
         </div>
     </div>
 </div>
