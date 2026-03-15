@@ -60,8 +60,7 @@ def open_settings(addon, is_update=False):
             border: 1px solid {accent}; 
             background-color: {box_bg};
         }}
-
-        /* Fix SpinBox Arrows */
+        
         QSpinBox::up-button, QSpinBox::down-button {{
             background-color: {box_bg};
             border-left: 1px solid {border_col};
@@ -214,6 +213,7 @@ def open_settings(addon, is_update=False):
     rb_lock_random.toggled.connect(toggle_pass_fields)
     toggle_pass_fields()
 
+    # --- ADD THIS MISSING BLOCK BACK IN ---
     if is_update:
         rb_lock_none.setEnabled(False)
         rb_lock_custom.setEnabled(False)
@@ -229,25 +229,36 @@ def open_settings(addon, is_update=False):
     sec_sec.setLayout(lay_sec)
     layout.addWidget(sec_sec)
 
-    btn_text = "Close" if is_update else "Activate Lock"
+    # --- Action Button ---
+    if is_update:
+        btn_text = "Abort Session"
+        btn_bg_col = "#ff3b30" if not is_night else "#ff453a"
+        btn_hover_col = "#e6352b" if not is_night else "#ff5549"
+        btn_fg_col = "white"
+    else:
+        btn_text = "Activate Lock"
+        btn_bg_col = btn_bg
+        btn_hover_col = btn_hover
+        btn_fg_col = btn_fg
+
     btn_start = QPushButton(btn_text)
     btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
     btn_start.setMinimumWidth(200)
     btn_start.setDefault(True)
     btn_start.setAutoDefault(True)
     btn_start.setStyleSheet(f"""
-        QPushButton {{ 
-            background-color: {btn_bg}; 
-            color: {btn_fg}; 
-            padding: 12px; 
-            font-size: 14px; 
-            font-weight: bold; 
-            border-radius: 10px; 
-            border: none;
-        }}
-        QPushButton:hover {{ background-color: {btn_hover}; }}
-        QPushButton:pressed {{ margin-top: 2px; margin-bottom: -2px; }}
-    """)
+            QPushButton {{ 
+                background-color: {btn_bg_col}; 
+                color: {btn_fg_col}; 
+                padding: 12px; 
+                font-size: 14px; 
+                font-weight: bold; 
+                border-radius: 10px; 
+                border: none;
+            }}
+            QPushButton:hover {{ background-color: {btn_hover_col}; }}
+            QPushButton:pressed {{ margin-top: 2px; margin-bottom: -2px; }}
+        """)
 
     def on_activate():
         settings = {
@@ -269,8 +280,22 @@ def open_settings(addon, is_update=False):
         if addon.start_lock(settings) is not False:
             d.accept()
 
+    def on_abort():
+        # Get the currently active lock type directly from the addon object
+        current_lock_type = getattr(addon, "lock_type", "none")
+        expected_pwd = getattr(addon, "password", "")
+
+        if current_lock_type == "none":
+            if open_confirm_quit_dialog():
+                addon.stop_lock(success=False)
+                d.accept()
+        else:
+            if open_unlock_dialog(current_lock_type, expected_pwd):
+                addon.stop_lock(success=False)
+                d.accept()
+
     if is_update:
-        btn_start.clicked.connect(d.accept)
+        btn_start.clicked.connect(on_abort)
     else:
         btn_start.clicked.connect(on_activate)
 

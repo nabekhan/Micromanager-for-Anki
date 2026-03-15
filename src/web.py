@@ -119,9 +119,8 @@ HUD_HTML_TEMPLATE = """
             <div class="hud-val" id="val-display">{VAL}</div>
             <div class="hud-label" id="lbl-display">{LBL}</div>
         </div>
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div style="display:flex; align-items:center;">
             <div id="hud-conf" class="hud-btn" title="Settings" onclick="pycmd('force_config')">&#9881;</div>
-            <div id="hud-stop" class="hud-btn" title="Stop" onclick="pycmd('force_unlock')">&times;</div>
         </div>
     </div>
 </div>

@@ -274,16 +274,16 @@ class AnkiLock:
 
         mw.show()
 
-        # BULLETPROOF HUD REMOVAL
-        # Finds any element with the HUD ID and removes it directly from the DOM
-        kill_js = """
-            var huds = document.querySelectorAll('#force-hud-container');
-            huds.forEach(function(hud) { hud.remove(); });
-            if (typeof removeForceHud === 'function') removeForceHud();
-        """
-
-        if mw.web:
-            mw.web.eval(kill_js)
+        # Instead of deleting the HUD, morph it into the unlocked Daily Progress tracker
+        if mw.state == "review":
+            self.update_webview()
+        else:
+            kill_js = """
+                        var huds = document.querySelectorAll('#force-hud-container');
+                        huds.forEach(function(hud) { hud.remove(); });
+                        if (typeof removeForceHud === 'function') removeForceHud();
+                    """
+            if mw.web: mw.web.eval(kill_js)
 
         if success:
             QApplication.beep()
@@ -296,6 +296,24 @@ class AnkiLock:
         label_display = "LOCKED"
         pct = 0.0
 
+        if not self.active:
+            # UNLOCKED MODE: Standard Anki Daily Progress
+            try:
+                counts = mw.col.sched.counts()
+                remaining = sum(counts) if counts else 0
+
+                # Find how many cards have been rated today
+                done = len(mw.col.find_cards("rated:1"))
+                total = done + remaining
+
+                pct = (done / total * 100) if total > 0 else 100.0
+                text_display = str(remaining)
+                label_display = "CARDS LEFT"
+
+                return text_display, label_display, max(0.0, min(100.0, pct))
+            except Exception:
+                return "0", "CARDS LEFT", 100.0
+
         # 1. TIME MODE (Bar grows from 0% -> 100%)
         if self.mode == "time":
             mins = int(self.current_val / 60)
@@ -303,11 +321,10 @@ class AnkiLock:
             text_display = f"{mins:02d}:{secs:02d}"
             label_display = "TIMER"
             if self.target_val > 0:
-                # Calculate elapsed time to make the bar fill up
                 elapsed = self.target_val - self.current_val
                 pct = (elapsed / self.target_val) * 100
 
-        # 2. CORRECT ANSWERS (Bar grows from 0% -> 100%)
+        # 2. CORRECT ANSWERS
         elif self.mode == "correct":
             remaining = max(0, self.target_val - self.current_val)
             text_display = str(remaining)
@@ -315,7 +332,7 @@ class AnkiLock:
             if self.target_val > 0:
                 pct = (self.current_val / self.target_val) * 100
 
-        # 3. TOTAL REVIEWS / CARDS (Bar grows from 0% -> 100%)
+        # 3. TOTAL REVIEWS / CARDS
         elif self.mode == "cards":
             remaining = max(0, self.target_val - self.current_val)
             text_display = str(remaining)
@@ -323,7 +340,7 @@ class AnkiLock:
             if self.target_val > 0:
                 pct = (self.current_val / self.target_val) * 100
 
-        # 4. NEW CARDS ONLY (Bar grows from 0% -> 100%)
+        # 4. NEW CARDS ONLY
         elif self.mode == "new_cards":
             remaining = max(0, self.target_val - self.current_val)
             text_display = str(remaining)
@@ -331,42 +348,32 @@ class AnkiLock:
             if self.target_val > 0:
                 pct = (self.current_val / self.target_val) * 100
 
-        # 5. REVIEWS DUE (Bar grows from 0% -> 100%)
+        # 5. REVIEWS DUE
         elif self.mode == "finish_reviews":
             counts = mw.col.sched.counts() if mw.col else None
             remaining = counts[2] if counts and len(counts) >= 3 else 0
             text_display = str(remaining)
             label_display = "REVIEWS LEFT"
-
-            # If Anki dynamically adds reviews to the queue, push the goalpost back
-            if remaining > self.target_val:
-                self.target_val = remaining
-
+            if remaining > self.target_val: self.target_val = remaining
             if self.target_val > 0:
                 completed = self.target_val - remaining
                 pct = (completed / self.target_val) * 100
 
-        # 6. COMPLETE DECK (Bar grows from 0% -> 100%)
+        # 6. COMPLETE DECK
         elif self.mode == "finish_deck":
             counts = mw.col.sched.counts() if mw.col else None
-            # FIX: Only count New (counts[0]) and Review (counts[2]). Ignore Learning!
             remaining = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
             text_display = str(remaining)
             label_display = "TOTAL LEFT"
-
-            # If Anki dynamically adds to the queue, push the goalpost
-            if remaining > self.target_val:
-                self.target_val = remaining
-
+            if remaining > self.target_val: self.target_val = remaining
             if self.target_val > 0:
                 completed = self.target_val - remaining
                 pct = (completed / self.target_val) * 100
 
-        # Guarantee the CSS percentage never exceeds bounds
         return text_display, label_display, max(0.0, min(100.0, pct))
 
     def inject_hud(self, content, context):
-        if not isinstance(context, Reviewer) or not self.active: return
+        if not isinstance(context, Reviewer): return
 
         val_txt, lbl_txt, pct = self.get_current_display_values()
         style_block = "<style>" + get_hud_css_rules() + "</style>"
@@ -488,13 +495,12 @@ class AnkiLock:
                 self.update_webview()
 
     def on_question_shown(self, card):
-        if not self.active: return
+        if not self.active:
+            self.update_webview()
+            return
 
-        # Track if the current card is new (type 0) for the new_cards goal
         self._current_card_is_new = (card.type == 0)
 
-        # Edge Case: The user suspended/buried a card, which alters due counts
-        # without triggering on_answer. We check if they won the "finish_reviews" goal here.
         if self.mode == "finish_reviews":
             try:
                 counts = mw.col.sched.counts()
@@ -504,12 +510,9 @@ class AnkiLock:
                     return
             except AttributeError:
                 pass
-
-            # Check if the entire deck is cleared (Inside both on_tick AND on_question_shown)
         elif self.mode == "finish_deck":
             try:
                 counts = mw.col.sched.counts()
-                # FIX: Only check if New and Review are zero
                 remaining_total = (counts[0] + counts[2]) if counts and len(counts) >= 3 else 0
                 if remaining_total <= 0:
                     self.stop_lock(success=True)
@@ -517,15 +520,14 @@ class AnkiLock:
             except AttributeError:
                 pass
 
-        # Refresh the HUD on the new card
         self.update_webview()
 
     def on_answer(self, reviewer, card, ease):
-        if not self.active: return
+        if not self.active:
+            self.update_webview()
+            return
 
-        # Determine if this specific answer should give them a point
         counted = False
-
         if self.mode == "cards":
             counted = True
         elif self.mode == "correct" and ease > 1:
@@ -533,12 +535,9 @@ class AnkiLock:
         elif self.mode == "new_cards" and getattr(self, "_current_card_is_new", False):
             counted = True
 
-        # Save this action to our history stack
-        if not hasattr(self, "_history"):
-            self._history = []
+        if not hasattr(self, "_history"): self._history = []
         self._history.append(counted)
 
-        # Apply the point and check for victory
         if counted:
             self.current_val += 1
             self.update_persistence()
@@ -549,21 +548,17 @@ class AnkiLock:
         self.update_webview()
 
     def on_undo(self, *args):
-        if not self.active: return
+        if not self.active:
+            self.update_webview()
+            return
 
-        # For modes that rely purely on reading Anki's scheduler counts,
-        # we don't need math; we just tell the HUD to refresh its data.
         if self.mode in ["finish_reviews", "finish_deck"]:
             self.update_webview()
             return
 
-        # For counter-based modes, we look at the history stack
         if self.mode in ["cards", "correct", "new_cards"]:
             if hasattr(self, "_history") and len(self._history) > 0:
-                # Pop the most recent answer off the stack
                 last_action_counted = self._history.pop()
-
-                # If that answer gave them a point, take it away
                 if last_action_counted and self.current_val > 0:
                     self.current_val -= 1
                     self.update_persistence()
@@ -571,63 +566,45 @@ class AnkiLock:
             self.update_webview()
 
     def update_webview(self, *args, **kwargs):
-        if not self.active: return
         if mw.state != "review": return
         if not getattr(mw.reviewer, "card", None): return
 
         text_display, label_display, pct = self.get_current_display_values()
+        stop_display = "flex" if self.active else "none"
+
         safe_html = HUD_HTML_TEMPLATE.replace("{VAL}", text_display).replace("{LBL}", label_display).replace("{PCT}",
                                                                                                              str(pct))
         safe_html = safe_html.replace('\n', ' ').replace("'", "\\'")
         raw_css = get_hud_css_rules().replace('\n', ' ').replace("'", "\\'")
 
         js_cmd = f"""
-        (function(){{
-            var hud = document.getElementById('force-hud-container');
+                (function(){{
+                    var hud = document.getElementById('force-hud-container');
+                    if (!hud) {{
+                        var s = document.createElement('style');
+                        s.textContent = '{raw_css}';
+                        document.head.appendChild(s);
+                        var d = document.createElement('div');
+                        d.innerHTML = '{safe_html}';
+                        document.body.appendChild(d.firstElementChild);
+                        hud = document.getElementById('force-hud-container');
+                    }}
+                    if (hud) {{
+                        var valEl = document.getElementById('val-display');
+                        var lblEl = document.getElementById('lbl-display');
+                        var progEl = document.getElementById('force-hud-progress');
 
-            // If the HUD is missing, rebuild it from scratch
-            if (!hud) {{
-                var s = document.createElement('style');
-                s.textContent = '{raw_css}';
-                document.head.appendChild(s);
-
-                var d = document.createElement('div');
-                d.innerHTML = '{safe_html}';
-                document.body.appendChild(d.firstElementChild);
-
-                // Re-fetch the newly created HUD
-                hud = document.getElementById('force-hud-container');
-            }}
-
-            // Directly update the DOM to bypass window context resets
-            if (hud) {{
-                var valEl = document.getElementById('val-display');
-                var lblEl = document.getElementById('lbl-display');
-                var progEl = document.getElementById('force-hud-progress');
-
-                if (valEl) valEl.innerText = '{text_display}';
-                if (lblEl) lblEl.innerText = '{label_display}';
-                if (progEl) progEl.style.width = '{pct}%';
-            }}
-        }})();
-        """
+                        if (valEl) valEl.innerText = '{text_display}';
+                        if (lblEl) lblEl.innerText = '{label_display}';
+                        if (progEl) progEl.style.width = '{pct}%';
+                    }}
+                }})();
+                """
         mw.web.eval(js_cmd)
 
     def on_js_message(self, handled, message, context):
         if message == "force_config":
-            ui.open_settings(self, is_update=True)
-            return (True, None)
-
-        if message == "force_unlock":
-            if self.lock_type == "none":
-                # Use our custom UI to bypass the macOS native popup icon bug
-                if ui.open_confirm_quit_dialog():
-                    self.stop_lock(success=False)
-            else:
-                unlocked = ui.open_unlock_dialog(self.lock_type, self.password)
-                if unlocked:
-                    self.stop_lock(success=False)
-
+            ui.open_settings(self, is_update=self.active)
             return (True, None)
 
         return handled
