@@ -295,26 +295,47 @@ class AnkiLock:
         text_display = "0"
         label_display = "LOCKED"
         pct = 0.0
+        bar_color = "#ff3b30"  # Default to Red for all locked modes
 
         if not self.active:
             # UNLOCKED MODE: Standard Anki Daily Progress
             try:
                 counts = mw.col.sched.counts()
-                remaining = sum(counts) if counts else 0
 
-                # Find how many cards have been rated today
-                done = len(mw.col.find_cards("rated:1"))
-                total = done + remaining
+                if counts and len(counts) >= 3:
+                    new_cards, lrn_cards, rev_cards = counts[0], counts[1], counts[2]
+
+                    # Track the overall workload so the bar fills smoothly all day
+                    total_remaining_today = new_cards + lrn_cards + rev_cards
+
+                    if rev_cards > 0:
+                        remaining = rev_cards + lrn_cards
+                        label_display = "REV + LRN LEFT"
+                        bar_color = "#007aff"  # Blue
+                    else:
+                        remaining = new_cards + lrn_cards
+                        label_display = "NEW + LRN LEFT"
+                        bar_color = "#34c759"  # Green
+                else:
+                    remaining = sum(counts) if counts else 0
+                    total_remaining_today = remaining
+                    label_display = "CARDS LEFT"
+                    bar_color = "#007aff"  # Fallback Blue
+
+                # FIX 1: Only count cards done in the CURRENT deck today
+                done = len(mw.col.find_cards("deck:current rated:1"))
+
+                # FIX 2: Calculate percentage against the entire day's workload
+                total = done + total_remaining_today
 
                 pct = (done / total * 100) if total > 0 else 100.0
                 text_display = str(remaining)
-                label_display = "CARDS LEFT"
 
-                return text_display, label_display, max(0.0, min(100.0, pct))
+                return text_display, label_display, max(0.0, min(100.0, pct)), bar_color
             except Exception:
-                return "0", "CARDS LEFT", 100.0
+                return "0", "CARDS LEFT", 100.0, "#007aff"
 
-        # 1. TIME MODE (Bar grows from 0% -> 100%)
+        # 1. TIME MODE
         if self.mode == "time":
             mins = int(self.current_val / 60)
             secs = self.current_val % 60
@@ -370,16 +391,18 @@ class AnkiLock:
                 completed = self.target_val - remaining
                 pct = (completed / self.target_val) * 100
 
-        return text_display, label_display, max(0.0, min(100.0, pct))
+        return text_display, label_display, max(0.0, min(100.0, pct)), bar_color
 
     def inject_hud(self, content, context):
         if not isinstance(context, Reviewer): return
 
-        val_txt, lbl_txt, pct = self.get_current_display_values()
+        val_txt, lbl_txt, pct, color = self.get_current_display_values()
         style_block = "<style>" + get_hud_css_rules() + "</style>"
         content.head += style_block
 
-        html_str = HUD_HTML_TEMPLATE.replace("{VAL}", val_txt).replace("{LBL}", lbl_txt).replace("{PCT}", str(pct))
+        html_str = HUD_HTML_TEMPLATE.replace("{VAL}", val_txt).replace("{LBL}", lbl_txt).replace("{PCT}",
+                                                                                                 str(pct)).replace(
+            "{COLOR}", color)
         content.body += html_str
 
     def on_tick(self):
@@ -569,11 +592,12 @@ class AnkiLock:
         if mw.state != "review": return
         if not getattr(mw.reviewer, "card", None): return
 
-        text_display, label_display, pct = self.get_current_display_values()
+        text_display, label_display, pct, color = self.get_current_display_values()
         stop_display = "flex" if self.active else "none"
 
         safe_html = HUD_HTML_TEMPLATE.replace("{VAL}", text_display).replace("{LBL}", label_display).replace("{PCT}",
-                                                                                                             str(pct))
+                                                                                                             str(pct)).replace(
+            "{COLOR}", color)
         safe_html = safe_html.replace('\n', ' ').replace("'", "\\'")
         raw_css = get_hud_css_rules().replace('\n', ' ').replace("'", "\\'")
 
@@ -596,7 +620,10 @@ class AnkiLock:
 
                         if (valEl) valEl.innerText = '{text_display}';
                         if (lblEl) lblEl.innerText = '{label_display}';
-                        if (progEl) progEl.style.width = '{pct}%';
+                        if (progEl) {{
+                            progEl.style.width = '{pct}%';
+                            progEl.style.setProperty('background-color', '{color}', 'important');
+                        }}
                     }}
                 }})();
                 """

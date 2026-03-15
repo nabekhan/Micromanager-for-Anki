@@ -113,7 +113,7 @@ def get_hud_css_rules():
 
 HUD_HTML_TEMPLATE = """
 <div id="force-hud-container">
-    <div id="force-hud-progress" style="width: {PCT}%;"></div>
+    <div id="force-hud-progress" style="width: {PCT}%; background-color: {COLOR} !important;"></div>
     <div id="force-hud-content">
         <div class="hud-section" id="sec-display">
             <div class="hud-val" id="val-display">{VAL}</div>
