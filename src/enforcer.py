@@ -580,8 +580,15 @@ class AnkiLock:
             self.update_webview()
             return
 
+        # Check if the undo actually involved a flashcard review.
+        # Anki passes an 'OpChanges' object as the first argument.
+        is_review_undo = True
+        if args and hasattr(args[0], "review"):
+            is_review_undo = args[0].review
+
         if self.mode in ["cards", "correct", "new_cards"]:
-            if hasattr(self, "_history") and len(self._history) > 0:
+            # Only steal the point back if they ACTUALLY undid a review
+            if is_review_undo and hasattr(self, "_history") and len(self._history) > 0:
                 last_action_counted = self._history.pop()
                 if last_action_counted and self.current_val > 0:
                     self.current_val -= 1
