@@ -21,19 +21,32 @@ DEFAULT_CONFIG = {
 
 def ensure_config_exists():
     if not os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        # We also use atomic writing here just to be safe
+        temp_path = CONFIG_PATH + ".tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(DEFAULT_CONFIG, f, indent=4)
+        os.replace(temp_path, CONFIG_PATH)
 
 
 def load_config():
     ensure_config_exists()
 
     config = mw.addonManager.getConfig(ADDON_ID)
-    if config is None:
+    if config is not None:
+        return config
+
+    # Safety Net: If the file got corrupted somehow, don't crash Anki.
+    # Fall back to defaults and repair the file.
+    try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
-
-    return config
+    except (json.JSONDecodeError, ValueError):
+        # The file is corrupted. Overwrite it with safe defaults.
+        temp_path = CONFIG_PATH + ".tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(DEFAULT_CONFIG, f, indent=4)
+        os.replace(temp_path, CONFIG_PATH)
+        return DEFAULT_CONFIG.copy()
 
 
 def save_config(new_data):
@@ -42,9 +55,15 @@ def save_config(new_data):
     config = load_config()
     config.update(new_data)
 
-    # FORCE DISK WRITE: Bypass Anki's memory buffer to survive hard crashes
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+    # FORCE DISK WRITE (ATOMIC):
+    # Write to a temporary file first, then seamlessly swap it over.
+    # This survives hard crashes without corrupting the file.
+    temp_path = CONFIG_PATH + ".tmp"
+    with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
+
+    # os.replace is an atomic operation on most operating systems
+    os.replace(temp_path, CONFIG_PATH)
 
     # Still update Anki's internal state just in case
     mw.addonManager.writeConfig(ADDON_ID, config)
