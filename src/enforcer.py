@@ -193,8 +193,7 @@ class AnkiLock:
             self.current_val = self.target_val
 
         elif self.mode == "correct":
-            # Cap the goal to the total available cards so they don't get soft-locked
-            self.target_val = min(val, total_due)
+            self.target_val = val
             self.current_val = 0
             self.initial_minutes = 5
 
