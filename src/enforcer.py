@@ -559,8 +559,11 @@ class AnkiLock:
         elif self.mode == "new_cards" and getattr(self, "_current_card_is_new", False):
             counted = True
 
+        # Grab the exact database ID of the review that was just logged
+        latest_revlog_id = mw.col.db.scalar("select max(id) from revlog") or 0
+
         if not hasattr(self, "_history"): self._history = []
-        self._history.append(counted)
+        self._history.append((latest_revlog_id, counted))
 
         if counted:
             self.current_val += 1
@@ -580,19 +583,27 @@ class AnkiLock:
             self.update_webview()
             return
 
-        # Check if the undo actually involved a flashcard review.
-        # Anki passes an 'OpChanges' object as the first argument.
-        is_review_undo = True
-        if args and hasattr(args[0], "review"):
-            is_review_undo = args[0].review
-
         if self.mode in ["cards", "correct", "new_cards"]:
-            # Only steal the point back if they ACTUALLY undid a review
-            if is_review_undo and hasattr(self, "_history") and len(self._history) > 0:
-                last_action_counted = self._history.pop()
-                if last_action_counted and self.current_val > 0:
-                    self.current_val -= 1
-                    self.update_persistence()
+            if hasattr(self, "_history") and len(self._history) > 0:
+                last_record = self._history[-1]
+
+                # Failsafe: clears out old history formats if you reload the add-on live
+                if not isinstance(last_record, tuple):
+                    self._history.pop()
+                    return
+
+                last_revlog_id, last_action_counted = last_record
+
+                # Check Anki's database for the current highest review ID
+                current_max_revlog = mw.col.db.scalar("select max(id) from revlog") or 0
+
+                # If the current max ID is smaller than the one we saved,
+                # Anki definitively deleted the review from the database.
+                if current_max_revlog < last_revlog_id:
+                    self._history.pop()
+                    if last_action_counted and self.current_val > 0:
+                        self.current_val -= 1
+                        self.update_persistence()
 
             self.update_webview()
 

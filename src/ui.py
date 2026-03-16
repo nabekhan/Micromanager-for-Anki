@@ -365,15 +365,24 @@ def open_unlock_dialog(lock_type, expected_password):
     elif lock_type == "random":
         lbl = QLabel("Type the following exact text to unlock:")
         layout.addWidget(lbl)
+
+        # Apply a monospace font so I, l, 1, O, and 0 are clearly distinct
+        mono_style = "font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;"
+
         txt_target = QTextEdit(expected_password)
         txt_target.setReadOnly(True)
         txt_target.setFixedHeight(80)
         txt_target.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        txt_target.setStyleSheet(mono_style)
         layout.addWidget(txt_target)
+
         txt_input = QTextEdit()
         txt_input.setFixedHeight(80)
         txt_input.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        txt_input.setAcceptDrops(False)  # Prevent bypassing the paste blocker via drag-and-drop
+        txt_input.setStyleSheet(mono_style)
         layout.addWidget(txt_input)
+
         layout.addWidget(lbl_error)
         btn_unlock = QPushButton("Unlock")
         btn_unlock.setObjectName("btnUnlock")
@@ -391,6 +400,7 @@ def open_unlock_dialog(lock_type, expected_password):
         d.filter = EventBlocker(block_enter=True, block_paste=True, enter_callback=attempt_unlock, parent=d)
         txt_input.installEventFilter(d.filter)
         txt_input.setFocus()
+
     elif lock_type == "custom":
         lbl = QLabel("Enter password to quit:")
         layout.addWidget(lbl)
@@ -405,7 +415,8 @@ def open_unlock_dialog(lock_type, expected_password):
         btn_layout.addWidget(btn_unlock)
 
         def attempt_unlock():
-            if txt_input.text() == expected_password:
+            # Added .strip() here so it matches the logic used when saving the password
+            if txt_input.text().strip() == expected_password:
                 d.accept()
             else:
                 lbl_error.setText("Wrong password, try again.")
