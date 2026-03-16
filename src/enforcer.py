@@ -305,27 +305,29 @@ class AnkiLock:
                 if counts and len(counts) >= 3:
                     new_cards, lrn_cards, rev_cards = counts[0], counts[1], counts[2]
 
-                    # Track the overall workload so the bar fills smoothly all day
-                    total_remaining_today = new_cards + lrn_cards + rev_cards
+                    # Track the workload entirely ignoring learning cards
+                    total_remaining_today = new_cards + rev_cards
 
                     if rev_cards > 0:
-                        remaining = rev_cards + lrn_cards
-                        label_display = "REV + LRN LEFT"
+                        remaining = rev_cards
+                        label_display = "REVIEWS LEFT"
                         bar_color = "#007aff"  # Blue
-                    else:
-                        remaining = new_cards + lrn_cards
-                        label_display = "NEW + LRN LEFT"
+                    elif new_cards > 0:
+                        remaining = new_cards
+                        label_display = "NEW CARDS LEFT"
                         bar_color = "#34c759"  # Green
+                    else:
+                        remaining = 0
+                        label_display = "DONE"
+                        bar_color = "#34c759"  # Green when finished
                 else:
+                    # Fallback if Anki returns weird queue data
                     remaining = sum(counts) if counts else 0
                     total_remaining_today = remaining
                     label_display = "CARDS LEFT"
-                    bar_color = "#007aff"  # Fallback Blue
+                    bar_color = "#007aff"
 
-                # FIX 1: Only count cards done in the CURRENT deck today
                 done = len(mw.col.find_cards("deck:current rated:1"))
-
-                # FIX 2: Calculate percentage against the entire day's workload
                 total = done + total_remaining_today
 
                 pct = (done / total * 100) if total > 0 else 100.0
