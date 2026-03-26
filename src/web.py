@@ -1,23 +1,30 @@
 # web.py
 def get_hud_css_rules():
     return """
+    body {
+        padding-bottom: 60px !important; 
+    }
+    
     :root {
-        /* Inherit directly from Anki's native theme */
-        --hud-bg: var(--window-bg);
-        --hud-border: var(--border);
-        --hud-text: var(--text-fg);
+        /* Light Mode Defaults */
+        --hud-bg: #ececec;
+        --hud-border: transparent;
+        --hud-text: #000000; /* Solid Black */
 
-        /* Add-on specific accent variables */
         --hud-accent: #007aff;
         --hud-label: #666666;
-        --hud-btn-bg: rgba(0, 0, 0, 0.05); /* Transparent overlays instead of solid colors */
+        --hud-btn-bg: rgba(0, 0, 0, 0.05);
         --hud-btn-hover: rgba(0, 0, 0, 0.1);
     }
 
     .nightMode {
+        /* Night Mode - Matches your screenshot */
+        --hud-bg: #292929; 
+        --hud-text: #ffffff;  /* Forced White for the main number */
+        --hud-label: #aaaaaa; /* Light Grey for the "NEW CARDS LEFT" text */
+        
         --hud-accent: #0a84ff;
-        --hud-label: #999999;
-        --hud-btn-bg: rgba(255, 255, 255, 0.1); /* Transparent overlays for dark mode */
+        --hud-btn-bg: rgba(255, 255, 255, 0.1);
         --hud-btn-hover: rgba(255, 255, 255, 0.15);
     }
 
